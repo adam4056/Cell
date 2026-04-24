@@ -1,0 +1,36 @@
+# Runtime state
+context.json
+context.json.backup
+memory.json
+schedule.json
+summary.json
+
+# Config (contains API key)
+config.yaml
+
+# Brain — live file (auto-generated from brain_factory.py)
+brain/brain.py
+brain/backup/
+brain/functions/
+brain/audio_temp/
+brain/assets/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+env/
+
+# Personal
+ASSISTANT.md
+BIO.md
+
+# Claude Code internal
+.claude/
