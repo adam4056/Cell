@@ -62,3 +62,7 @@ Each turn the agent receives a user message and a list of tools it has built in 
 - Python 3.11+
 - DeepSeek API key ([platform.deepseek.com](https://platform.deepseek.com))
 - ffmpeg (for YouTube transcription)
+
+## License
+
+MIT — see [LICENSE](LICENSE).
