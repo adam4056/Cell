@@ -32,5 +32,9 @@ env/
 ASSISTANT.md
 BIO.md
 
+# AI dev helpers (instructions / notes for working on this project)
+CLAUDE.md
+TODO.md
+
 # Claude Code internal
 .claude/
