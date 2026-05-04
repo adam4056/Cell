@@ -2,3 +2,12 @@ PyYAML>=6.0
 requests>=2.31
 rich>=13.7
 textual>=0.50
+beautifulsoup4>=4.12
+
+# Memory retrieval. sentence-transformers is optional (~470 MB model on first
+# use) — without it, retrieval falls back to keyword matching with crude stem
+# trimming. Install for proper PersonaVLM-style semantic recall.
+sentence-transformers>=2.5
+
+# Optional: headless browser for JS-heavy sites
+# playwright>=1.40

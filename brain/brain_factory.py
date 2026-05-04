@@ -1,15 +1,16 @@
-import sys
 import os
+import sys
 import io
 import contextlib
 import importlib.util
 import json
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+sys.path.insert(0, os.path.dirname(__file__))
 
-from core import proxy
+import core_rpc
 
-FUNCTIONS_DIR = os.path.join(os.path.dirname(__file__), "functions")
+FACTORY_FUNCTIONS_DIR = os.path.join(os.path.dirname(__file__), "factory_functions")
+DYNAMIC_FUNCTIONS_DIR = os.path.join(os.path.dirname(__file__), "functions")
 MAX_ITERATIONS = 25
 
 SELF_IMPROVE_TOOL = {
@@ -46,39 +47,46 @@ def _normalize_spec(spec: dict) -> dict:
 
 
 def _load_functions() -> tuple[list, dict]:
+    """Load tool functions from both factory_functions/ (shipped, in-git) and
+    functions/ (dynamic, gitignored, wiped on factory reset). On name
+    collision, dynamic wins so the brain can override factory tools."""
     tools = []
     modules = {}
-    if not os.path.exists(FUNCTIONS_DIR):
-        return tools, modules
-    for fname in os.listdir(FUNCTIONS_DIR):
-        if not fname.endswith(".py"):
+    for fdir in (FACTORY_FUNCTIONS_DIR, DYNAMIC_FUNCTIONS_DIR):
+        if not os.path.exists(fdir):
             continue
-        path = os.path.join(FUNCTIONS_DIR, fname)
-        spec = importlib.util.spec_from_file_location(fname[:-3], path)
-        mod = importlib.util.module_from_spec(spec)
-        try:
-            spec.loader.exec_module(mod)
-        except Exception:
-            continue
-        if hasattr(mod, "SPEC") and hasattr(mod, "run"):
-            normalized = _normalize_spec({**mod.SPEC, "name": fname[:-3]})
-            tools.append({"type": "function", "function": normalized})
-            modules[fname[:-3]] = mod
+        for fname in os.listdir(fdir):
+            if not fname.endswith(".py") or fname.startswith("_"):
+                continue
+            path = os.path.join(fdir, fname)
+            mod_spec = importlib.util.spec_from_file_location(fname[:-3], path)
+            mod = importlib.util.module_from_spec(mod_spec)
+            try:
+                mod_spec.loader.exec_module(mod)
+            except Exception:
+                continue
+            if not (hasattr(mod, "SPEC") and hasattr(mod, "run")):
+                continue
+            name = fname[:-3]
+            normalized = _normalize_spec({**mod.SPEC, "name": name})
+            entry = {"type": "function", "function": normalized}
+            existing = next((i for i, t in enumerate(tools) if t["function"]["name"] == name), None)
+            if existing is not None:
+                tools[existing] = entry
+            else:
+                tools.append(entry)
+            modules[name] = mod
     return tools, modules
 
 
-def run(context: list, on_event=None, self_improve_handler=None) -> str:
+def run(context: list) -> str:
     dyn_tools, modules = _load_functions()
     tools = [SELF_IMPROVE_TOOL] + dyn_tools
     messages = list(context)
 
-    def emit(msg):
-        if on_event:
-            on_event(msg)
-
     for iteration in range(1, MAX_ITERATIONS + 1):
-        message = proxy.chat(messages, tools=tools)
-        emit(f"⏱ llm call #{iteration}")
+        message = core_rpc.llm.chat(messages, tools=tools)
+        core_rpc.event(f"⏱ llm call #{iteration}")
 
         if not message.get("tool_calls"):
             return message.get("content", "")
@@ -92,15 +100,14 @@ def run(context: list, on_event=None, self_improve_handler=None) -> str:
             args = json.loads(call["function"]["arguments"])
 
             if name == "self_improve":
-                emit(f"→ self_improve: {args.get('filename')}")
-                if self_improve_handler is None:
-                    result = "[ERROR] self_improve handler not provided by runtime"
-                else:
-                    try:
-                        result = str(self_improve_handler(args))
-                    except Exception as e:
-                        result = f"[ERROR] self_improve failed: {e}"
-                    did_self_improve = True
+                core_rpc.event(f"→ self_improve: {args.get('filename')}")
+                try:
+                    result = core_rpc.self_improve(
+                        args["filename"], args["code"], args["description"]
+                    )
+                except Exception as e:
+                    result = f"[ERROR] self_improve failed: {e}"
+                did_self_improve = True
                 messages.append({
                     "role": "tool",
                     "tool_call_id": call["id"],
@@ -108,7 +115,7 @@ def run(context: list, on_event=None, self_improve_handler=None) -> str:
                 })
                 continue
 
-            emit(f"→ {name}")
+            core_rpc.event(f"→ {name}")
 
             if name in modules:
                 try:
@@ -118,7 +125,7 @@ def run(context: list, on_event=None, self_improve_handler=None) -> str:
                     captured = buf.getvalue().strip()
                     if captured:
                         for line in captured.splitlines():
-                            emit(f"[log] {line}")
+                            core_rpc.event(f"[log] {line}")
                 except Exception as e:
                     result = f"[ERROR] {e}"
             else:
@@ -135,3 +142,14 @@ def run(context: list, on_event=None, self_improve_handler=None) -> str:
             tools = [SELF_IMPROVE_TOOL] + dyn_tools
 
     return "[ITERATION LIMIT] reached MAX_ITERATIONS without final response"
+
+
+if __name__ == "__main__":
+    init = core_rpc.get_initial_input()
+    try:
+        response = run(init["messages"])
+    except Exception as e:
+        import traceback as _tb
+        core_rpc.done(f"[SYSTEM ERROR] brain run exception\n{_tb.format_exc()}")
+        sys.exit(1)
+    core_rpc.done(response)

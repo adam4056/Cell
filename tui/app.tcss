@@ -1,0 +1,176 @@
+/* Cell-2 TUI Styles */
+
+Screen {
+    align: center middle;
+}
+
+/* Chat layout */
+.chat-container {
+    width: 100%;
+    height: 100%;
+    padding: 0 1;
+}
+
+#chat-log {
+    width: 100%;
+    height: 1fr;
+    border: solid $primary;
+    padding: 0 1;
+}
+
+/* Input row */
+.input-row {
+    width: 100%;
+    height: auto;
+    padding: 1 0;
+}
+
+.input-row Input {
+    width: 1fr;
+}
+
+.input-btn {
+    width: 5;
+    margin: 0 1;
+}
+
+/* Attachment preview */
+#attachment-preview {
+    height: auto;
+    padding: 0 1;
+    display: none;
+}
+
+.attach-bar {
+    width: 100%;
+    height: auto;
+    padding: 0 1;
+    background: $surface-darken-1;
+}
+
+.attach-icon {
+    width: 3;
+    content-align: center middle;
+}
+
+.attach-name {
+    width: 1fr;
+    content-align: left middle;
+}
+
+.attach-remove {
+    width: 5;
+}
+
+/* Permission modal */
+.perm-modal {
+    width: 60;
+    height: auto;
+    border: thick $background 80%;
+    background: $surface;
+    padding: 1 2;
+}
+
+.perm-title {
+    text-style: bold;
+    text-align: center;
+    width: 100%;
+    margin: 1 0;
+}
+
+.perm-op {
+    text-align: center;
+    width: 100%;
+    color: $text-accent;
+}
+
+.perm-detail {
+    width: 100%;
+    margin: 1 0;
+    color: $text-disabled;
+}
+
+.perm-buttons {
+    width: 100%;
+    height: auto;
+    align: center middle;
+    margin: 1 0;
+}
+
+.perm-buttons Button {
+    margin: 0 1;
+}
+
+/* Onboarding modal */
+.onboarding-modal {
+    width: 70;
+    height: auto;
+    border: thick $background 80%;
+    background: $surface;
+    padding: 1 2;
+}
+
+.onboarding-title {
+    text-style: bold;
+    text-align: center;
+    width: 100%;
+    margin: 1 0;
+    color: $text-accent;
+}
+
+.onboarding-subtitle {
+    text-align: center;
+    width: 100%;
+    margin: 0 0 1 0;
+    color: $text-disabled;
+}
+
+.field-label {
+    width: 100%;
+    margin: 1 0 0 0;
+    color: $text;
+}
+
+.onboarding-buttons {
+    width: 100%;
+    height: auto;
+    align: center middle;
+    margin: 1 0;
+}
+
+.onboarding-buttons Button {
+    margin: 0 1;
+}
+
+/* Attach modal */
+.attach-modal {
+    width: 60;
+    height: auto;
+    border: thick $background 80%;
+    background: $surface;
+    padding: 1 2;
+}
+
+.modal-title {
+    text-style: bold;
+    text-align: center;
+    width: 100%;
+    margin: 1 0;
+}
+
+.modal-subtitle {
+    width: 100%;
+    margin: 0 0 1 0;
+    color: $text-disabled;
+}
+
+.modal-buttons {
+    width: 100%;
+    height: auto;
+    align: center middle;
+    margin: 1 0;
+}
+
+.modal-buttons Button {
+    margin: 0 1;
+}

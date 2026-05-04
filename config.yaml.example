@@ -1,2 +1,14 @@
-deepseek_api_key: "sk-your-api-key-here"
+# OpenAI-compatible chat backend (Ollama, DeepSeek, OpenAI, …)
+api_base: "http://127.0.0.1:11435/v1"   # Ollama default port: 11434
+api_key: "ollama"                        # any non-empty value for Ollama
+model: "gemma4:e4b"
+
+# Legacy keys (still respected if api_base unset):
+# deepseek_api_key: "sk-..."
+
+# Brave Search API key (https://brave.com/search/api/)
+brave_search_api_key: ""
+
 ambient_interval_seconds: 0
+telegram_bot_token: ""
+telegram_user_id: null

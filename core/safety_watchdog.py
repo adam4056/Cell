@@ -1,13 +1,12 @@
-import inspect
+import ast
 import shutil
 import subprocess
 import sys
 import tempfile
-import traceback
 import os
-import importlib.util
 
 BRAIN_FILE = os.path.join(os.path.dirname(__file__), "..", "brain", "brain.py")
+BRAIN_DIR = os.path.dirname(BRAIN_FILE)
 BACKUP_DIR = os.path.join(os.path.dirname(__file__), "..", "brain", "backup")
 CELL_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 MAX_BACKUPS = 20
@@ -15,8 +14,31 @@ MAX_ROLLBACK_ATTEMPTS = 3
 SMOKE_TEST_TIMEOUT = 10
 
 
+def _has_main_guard(code: str) -> bool:
+    try:
+        tree = ast.parse(code)
+    except SyntaxError:
+        return False
+    for node in tree.body:
+        if not isinstance(node, ast.If):
+            continue
+        cmp = node.test
+        if not isinstance(cmp, ast.Compare):
+            continue
+        left = cmp.left
+        if isinstance(left, ast.Name) and left.id == "__name__":
+            return True
+        if cmp.comparators and isinstance(cmp.comparators[0], ast.Name) and cmp.comparators[0].id == "__name__":
+            return True
+    return False
+
+
 def smoke_test_brain_source(code: str) -> tuple[bool, str]:
-    fd, tmp = tempfile.mkstemp(suffix=".py", prefix="brain_smoke_")
+    if not _has_main_guard(code):
+        return False, "missing `if __name__ == '__main__':` block — brain.py must be runnable as a script"
+    # Write the smoke probe inside brain/ so the candidate's own
+    # `sys.path.insert(0, dirname(__file__))` resolves `core_rpc`.
+    fd, tmp = tempfile.mkstemp(suffix=".py", prefix="brain_smoke_", dir=BRAIN_DIR)
     with os.fdopen(fd, "w", encoding="utf-8") as f:
         f.write(code)
     probe = (
@@ -60,66 +82,16 @@ def rotate_backups() -> None:
             pass
 
 
-def _try_load() -> tuple[object | None, str | None]:
-    try:
-        spec = importlib.util.spec_from_file_location("brain", BRAIN_FILE)
-        module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(module)
-        return module, None
-    except Exception:
-        return None, traceback.format_exc()
-
-
-def _invoke_run(module, context, on_event, self_improve_handler=None):
-    try:
-        params = inspect.signature(module.run).parameters
-    except (TypeError, ValueError):
-        return module.run(context, on_event=on_event)
-    kwargs = {}
-    has_var_kw = any(p.kind == inspect.Parameter.VAR_KEYWORD for p in params.values())
-    if "on_event" in params or has_var_kw:
-        kwargs["on_event"] = on_event
-    if "self_improve_handler" in params or has_var_kw:
-        kwargs["self_improve_handler"] = self_improve_handler
-    return module.run(context, **kwargs)
-
-
-def _rollback_chain() -> tuple[object | None, list]:
+def rollback_to_working() -> tuple[bool, list]:
+    """Restore the newest backup that passes smoke test. Returns (ok, errors)."""
     errors = []
     for candidate in _backups_newest_first()[:MAX_ROLLBACK_ATTEMPTS]:
+        with open(candidate, "r", encoding="utf-8") as f:
+            code = f.read()
+        ok, err = smoke_test_brain_source(code)
+        if not ok:
+            errors.append((candidate, err))
+            continue
         shutil.copy2(candidate, BRAIN_FILE)
-        module, err = _try_load()
-        if module is not None:
-            return module, errors
-        errors.append((candidate, err))
-    return None, errors
-
-
-def run_brain(context: list, on_event=None, self_improve_handler=None) -> str:
-    module, load_err = _try_load()
-    if module is None:
-        recovered, chain_errors = _rollback_chain()
-        if recovered is None:
-            trail = "\n---\n".join(f"{os.path.basename(p)}:\n{e}" for p, e in chain_errors)
-            return f"[SYSTEM ERROR] brain load failed; rollback chain exhausted\nOriginal:\n{load_err}\n\nRollback attempts:\n{trail}"
-        module = recovered
-        rollback_note = f"[SYSTEM] brain rolled back due to load error:\n{load_err}"
-        if on_event:
-            on_event(rollback_note)
-
-    try:
-        return _invoke_run(module, context, on_event, self_improve_handler)
-    except (ImportError, AttributeError, TypeError, SyntaxError, NameError):
-        run_err = traceback.format_exc()
-        recovered, chain_errors = _rollback_chain()
-        if recovered is None:
-            trail = "\n---\n".join(f"{os.path.basename(p)}:\n{e}" for p, e in chain_errors)
-            return f"[SYSTEM ERROR] brain run broken; rollback chain exhausted\nOriginal:\n{run_err}\n\nRollback attempts:\n{trail}"
-        if on_event:
-            on_event(f"[SYSTEM] brain rolled back due to broken run:\n{run_err}")
-        try:
-            return _invoke_run(recovered, context, on_event, self_improve_handler)
-        except Exception:
-            return f"[SYSTEM ERROR] brain run exception after rollback\n{traceback.format_exc()}"
-    except Exception:
-        return f"[SYSTEM ERROR] brain run exception\n{traceback.format_exc()}"
+        return True, errors
+    return False, errors

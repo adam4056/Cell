@@ -2,13 +2,17 @@ import os
 import requests
 import yaml
 
-DEEPSEEK_API_URL = "https://api.deepseek.com/chat/completions"
-DEFAULT_MODEL = "deepseek-chat"
 DEFAULT_TIMEOUT = 60
 
 _config_path = os.path.join(os.path.dirname(__file__), "..", "config.yaml")
 with open(_config_path, "r", encoding="utf-8") as _f:
-    _api_key = yaml.safe_load(_f).get("deepseek_api_key", "")
+    _cfg = yaml.safe_load(_f) or {}
+
+# OpenAI-compatible config (works for Ollama via /v1, DeepSeek, etc.)
+_api_base = (_cfg.get("api_base") or "https://api.deepseek.com").rstrip("/")
+_api_key = _cfg.get("api_key") or _cfg.get("deepseek_api_key", "") or "noauth"
+DEFAULT_MODEL = _cfg.get("model") or "deepseek-chat"
+API_URL = _api_base + "/chat/completions"
 
 
 class ProxyAPIError(Exception):
@@ -22,15 +26,18 @@ def get_last_usage() -> dict:
     return _last_usage
 
 
-def chat(messages: list, tools: list | None = None, model: str = DEFAULT_MODEL, timeout: int = DEFAULT_TIMEOUT) -> dict:
+def chat(messages: list, tools: list | None = None, model: str | None = None, timeout: int = DEFAULT_TIMEOUT) -> dict:
     global _last_usage
-    payload = {"model": model, "messages": messages}
+    payload = {"model": model or DEFAULT_MODEL, "messages": messages}
     if tools:
         payload["tools"] = tools
         payload["tool_choice"] = "auto"
     response = requests.post(
-        DEEPSEEK_API_URL,
-        headers={"Authorization": f"Bearer {_api_key}", "Content-Type": "application/json"},
+        API_URL,
+        headers={
+            "Authorization": f"Bearer {_api_key}",
+            "Content-Type": "application/json",
+        },
         json=payload,
         timeout=timeout,
     )
@@ -42,5 +49,5 @@ def chat(messages: list, tools: list | None = None, model: str = DEFAULT_MODEL, 
     return data["choices"][0]["message"]
 
 
-def request(messages: list, model: str = DEFAULT_MODEL) -> str:
+def request(messages: list, model: str | None = None) -> str:
     return chat(messages, model=model).get("content", "")

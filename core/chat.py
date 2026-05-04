@@ -11,6 +11,7 @@ def _load_assistant_instructions() -> str:
     with open(_ASSISTANT_MD, "r", encoding="utf-8") as f:
         return f.read().strip()
 
+
 SYSTEM_PROMPT = """\
 # Cell-2 — self-improving autonomous agent
 
@@ -49,12 +50,57 @@ Therefore your default reflex when a task needs a capability you don't see in th
 
 ## Runtime modules (import inside any function)
 
+You run sandboxed in a subprocess. The only channel out is `core_rpc`. Do **not** import from `core.*` — it is unreachable from the sandbox.
+
 ```python
-from core import scheduler, inbox, memory_store
+from core_rpc import scheduler, inbox, memory_store, host
 ```
 - `scheduler.add(task_id, description, interval_seconds=N)` for recurring; `run_at='ISO8601'` for one-shot. `remove(task_id)`, `list_tasks()`.
 - `inbox.post(message)` pushes a line to the user's terminal between prompts — use for background or scheduled output the user should see when they're not actively chatting.
 - `memory_store.set/get/delete/get_all`. Keys prefixed `profile.*` render in the user-profile block above these instructions.
+- `host.read_file(path) / host.write_file(path, content) / host.run_command(cmd)` — touches the user's machine *outside* the sandbox. Each call triggers a permission dialog. Use sparingly and only when the request needs the user's real filesystem or shell.
+
+Inside the sandbox you have full Python, network, and a writable workspace at `brain/` — no permission needed for those.
+
+## Built-in tools (autonomous use — no need to ask user)
+
+When a task needs web access, calculation, or file operations, use these directly. Do NOT tell the user "I don't have access" — you do.
+
+**Web & Search:**
+```python
+from core.browser import fetch_url, search_web
+result = fetch_url("https://example.com")        # returns {title, text, url}
+results = search_web("python tutorial")          # returns list of {title, url, snippet}
+```
+
+**Code execution:**
+```python
+from core.sandbox import run_code
+result = run_code("print(2+2)", packages=["numpy"])  # returns {success, stdout, stderr}
+```
+- Use for: calculations, data analysis, testing code, web scraping
+- Install packages via `packages=["name"]` parameter
+
+**Scheduling:**
+```python
+from core.smart_scheduler import schedule
+schedule("every morning at 8am summarize my emails")
+```
+
+These are **pre-installed** — use them immediately without asking permission.
+
+## Memory system
+
+You have access to a four-layer memory system that persists across conversations:
+
+- **Core** — Identity, name, base facts about the user. Always included in your context.
+- **Semantic** — Key-value facts (preferences, allergies, habits). Overwritable when facts change.
+- **Episodic** — Events with timestamps (diary of user's life). Append-only.
+- **Procedural** — Goals, plans, routines, habits. Evolving.
+
+**Memory context** is automatically injected into your system prompt each turn. Use it to personalize responses. If the user mentions something new that should be remembered, you don't need to do anything special — the background curator will detect and store it. However, for critical facts the user explicitly wants saved, you can use `memory_store.set(key, value)` with keys prefixed `profile.*`.
+
+**Why this matters:** Unlike RAG which accumulates everything, this memory actively manages, updates, and deletes information. When a user says "I switched from mango to lemon," the old fact gets overwritten. When you answer, reference their known preferences from memory context.
 
 ## Patterns
 
@@ -85,18 +131,24 @@ PROFILE_PREFIX = "profile."
 
 
 def _profile_block() -> str:
-    items = {k[len(PROFILE_PREFIX):]: v for k, v in memory_store.get_all().items() if k.startswith(PROFILE_PREFIX)}
+    items = {
+        k[len(PROFILE_PREFIX) :]: v
+        for k, v in memory_store.get_all().items()
+        if k.startswith(PROFILE_PREFIX)
+    }
     if not items:
         return ""
     lines = [f"- {k}: {v}" for k, v in sorted(items.items())]
     return "## User profile\n" + "\n".join(lines)
 
 
-def _assemble_system() -> str:
+def _assemble_system(memory_context: str = "") -> str:
     parts = [SYSTEM_PROMPT]
     assistant = _load_assistant_instructions()
     if assistant:
         parts.append(f"## User-defined assistant instructions\n\n{assistant}")
+    if memory_context:
+        parts.append(f"## Memory context\n\n{memory_context}")
     profile = _profile_block()
     if profile:
         parts.append(profile)
@@ -114,18 +166,32 @@ def _sanitize_history(history: list) -> list:
         if role == "system":
             note = f"[SYSTEM NOTE] {content}"
             if out and out[-1]["role"] == "user":
-                out[-1] = {"role": "user", "content": out[-1]["content"] + "\n\n" + note}
+                out[-1] = {
+                    "role": "user",
+                    "content": out[-1]["content"] + "\n\n" + note,
+                }
             else:
                 out.append({"role": "user", "content": note})
         elif role in ("user", "assistant", "tool"):
-            if role == "user" and out and out[-1]["role"] == "user" and "tool_calls" not in out[-1]:
-                out[-1] = {"role": "user", "content": out[-1]["content"] + "\n\n" + content}
+            if (
+                role == "user"
+                and out
+                and out[-1]["role"] == "user"
+                and "tool_calls" not in out[-1]
+            ):
+                out[-1] = {
+                    "role": "user",
+                    "content": out[-1]["content"] + "\n\n" + content,
+                }
             else:
                 out.append(m)
         else:
             folded = f"[{role}] {content}"
             if out and out[-1]["role"] == "user":
-                out[-1] = {"role": "user", "content": out[-1]["content"] + "\n\n" + folded}
+                out[-1] = {
+                    "role": "user",
+                    "content": out[-1]["content"] + "\n\n" + folded,
+                }
             else:
                 out.append({"role": "user", "content": folded})
     return out
@@ -135,27 +201,35 @@ def _append_user(messages: list, content: str) -> None:
     if not content:
         return
     if messages and messages[-1]["role"] == "user" and "tool_calls" not in messages[-1]:
-        messages[-1] = {"role": "user", "content": messages[-1]["content"] + "\n\n" + content}
+        messages[-1] = {
+            "role": "user",
+            "content": messages[-1]["content"] + "\n\n" + content,
+        }
     else:
         messages.append({"role": "user", "content": content})
 
 
-def build_input(history: list, user_message: str) -> list:
-    messages = [{"role": "system", "content": _assemble_system()}]
+def build_input(history: list, user_message: str, memory_context: str = "") -> list:
+    messages = [{"role": "system", "content": _assemble_system(memory_context)}]
     messages.extend(_sanitize_history(history))
     _append_user(messages, user_message)
     return messages
 
 
-def build_scheduled_input(history: list, task_description: str) -> list:
-    messages = [{"role": "system", "content": _assemble_system()}]
+def build_scheduled_input(
+    history: list, task_description: str, memory_context: str = ""
+) -> list:
+    messages = [{"role": "system", "content": _assemble_system(memory_context)}]
     messages.extend(_sanitize_history(history))
     _append_user(messages, f"{SCHEDULED_TASK_PREFIX} {task_description}")
     return messages
 
 
-def build_ambient_input(history: list) -> list:
-    messages = [{"role": "system", "content": _assemble_system()}]
+def build_ambient_input(history: list, memory_context: str = "") -> list:
+    messages = [{"role": "system", "content": _assemble_system(memory_context)}]
     messages.extend(_sanitize_history(history))
-    _append_user(messages, f"{AMBIENT_PREFIX} Idle tick. The user is not watching. Inspect concrete state — `scheduler.list_tasks()`, `memory_store.get_all()`, recent conversation — and act only if something is genuinely due, missed, or broken (a stale scheduled task whose goal is already met, a commitment you promised by a deadline that has passed, a follow-up the user explicitly asked for). Do not invent work, do not greet, do not summarize. If nothing needs doing, return an empty string to end the tick silently. Any user-facing output must go through `inbox.post(...)` from inside a function, not via your reply.")
+    _append_user(
+        messages,
+        f"{AMBIENT_PREFIX} Idle tick. The user is not watching. Inspect concrete state — `scheduler.list_tasks()`, `memory_store.get_all()`, recent conversation — and act only if something is genuinely due, missed, or broken (a stale scheduled task whose goal is already met, a commitment you promised by a deadline that has passed, a follow-up the user explicitly asked for). Do not invent work, do not greet, do not summarize. If nothing needs doing, return an empty string to end the tick silently. Any user-facing output must go through `inbox.post(...)` from inside a function, not via your reply.",
+    )
     return messages
