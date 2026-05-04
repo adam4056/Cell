@@ -1,27 +1,21 @@
-"""Cell-2 CLI — Keyboard-only terminal interface.
+"""Cell-2 CLI — Traditional terminal interface using blessed.
 
-Minimal, fast, no mouse. Just a chat log and input line.
+Pure text, no GUI widgets. Like irssi or weechat.
 """
 
 import os
+import sys
 import threading
 import time
 
-from textual.app import App
-from textual.containers import Horizontal, Vertical
-from textual.widgets import (
-    Footer,
-    Header,
-    Input,
-    RichLog,
-    Static,
-)
+from blessed import Terminal
 
 from core import (
     context_store,
     inbox,
     memory_personality,
     permissions,
+    scheduler,
     settings,
     telegram_bot,
 )
@@ -29,268 +23,312 @@ from core.core import process, start_scheduler
 from core.memory_engine import engine as memory_engine
 
 
-class CellCLI(App):
-    """Minimal CLI interface for Cell-2."""
+class CellCLI:
+    """Traditional CLI chat interface."""
 
-    CSS_PATH = "app.tcss"
-    TITLE = "Cell-2"
-    SUB_TITLE = "AI Agent"
-
-    ENABLE_COMMAND_PALETTE = False
-
-    def __init__(self) -> None:
-        super().__init__()
+    def __init__(self):
+        self.term = Terminal()
+        self.messages: list[tuple[str, str]] = []  # (role, content)
+        self.input_buffer = ""
+        self.cursor_pos = 0
         self._busy = False
-        self._permission_event = threading.Event()
-        self._permission_result = "skip"
-        self._file_path = ""
+        self._running = True
+        self._inbox_queue: list[str] = []
 
-    def compose(self):
-        yield Header(show_clock=False)
-        yield RichLog(id="chat-log", markup=True, wrap=True, highlight=True)
-        with Horizontal(id="input-row"):
-            yield Input(
-                placeholder="Type message or /help...",
-                id="chat-input",
+    def run(self):
+        import sys
+
+        # Force UTF-8 on Windows
+        if hasattr(sys.stdout, "reconfigure"):
+            sys.stdout.reconfigure(encoding="utf-8")
+
+        with self.term.cbreak(), self.term.hidden_cursor():
+            # Start background
+            start_scheduler(ambient_interval=0)
+            permissions.set_dialog(self._ask_permission)
+            telegram_bot.start()
+            self._start_inbox_thread()
+            self._load_history()
+
+            # Welcome
+            if settings.is_first_run():
+                self._add_system(
+                    "Cell-2 — your personal AI agent. Type /help for commands."
+                )
+                settings.complete_onboarding()
+            else:
+                self._add_system("Cell-2 ready.")
+
+            self._draw()
+
+            while self._running:
+                key = self.term.inkey(timeout=0.05)
+                if key:
+                    self._handle_key(key)
+
+                # Check inbox
+                if self._inbox_queue:
+                    msg = self._inbox_queue.pop(0)
+                    self._add_system(f"[inbox] {msg}")
+                    self._draw()
+
+    def _start_inbox_thread(self):
+        def loop():
+            while self._running:
+                time.sleep(1.0)
+                msgs = inbox.drain()
+                for m in msgs:
+                    self._inbox_queue.append(m)
+
+        threading.Thread(target=loop, daemon=True).start()
+
+    def _load_history(self):
+        history = context_store.get_all()
+        for m in history[-50:]:  # last 50
+            role = m.get("role", "")
+            content = m.get("content", "")
+            if role == "user":
+                self.messages.append(("user", content))
+            elif role == "assistant":
+                self.messages.append(("agent", content))
+            elif role == "system":
+                self.messages.append(("system", content))
+
+    def _handle_key(self, key):
+        if key.name == "KEY_ENTER":
+            text = self.input_buffer.strip()
+            self.input_buffer = ""
+            self.cursor_pos = 0
+            if text:
+                self._process_input(text)
+            self._draw()
+        elif key.name == "KEY_BACKSPACE" or key == "\b":
+            if self.cursor_pos > 0:
+                self.input_buffer = (
+                    self.input_buffer[: self.cursor_pos - 1]
+                    + self.input_buffer[self.cursor_pos :]
+                )
+                self.cursor_pos -= 1
+                self._draw()
+        elif key.name == "KEY_LEFT":
+            if self.cursor_pos > 0:
+                self.cursor_pos -= 1
+                self._draw()
+        elif key.name == "KEY_RIGHT":
+            if self.cursor_pos < len(self.input_buffer):
+                self.cursor_pos += 1
+                self._draw()
+        elif key.name == "KEY_HOME":
+            self.cursor_pos = 0
+            self._draw()
+        elif key.name == "KEY_END":
+            self.cursor_pos = len(self.input_buffer)
+            self._draw()
+        elif key.name == "KEY_DELETE":
+            if self.cursor_pos < len(self.input_buffer):
+                self.input_buffer = (
+                    self.input_buffer[: self.cursor_pos]
+                    + self.input_buffer[self.cursor_pos + 1 :]
+                )
+                self._draw()
+        elif key.name == "KEY_ESCAPE" or (key == "c" and key.ctrl):
+            self._running = False
+        elif key.is_sequence:
+            pass  # ignore other special keys
+        else:
+            self.input_buffer = (
+                self.input_buffer[: self.cursor_pos]
+                + key
+                + self.input_buffer[self.cursor_pos :]
             )
-        yield Footer()
+            self.cursor_pos += 1
+            self._draw()
 
-    def on_mount(self):
-        # Start background
-        start_scheduler(ambient_interval=0)
-        permissions.set_dialog(self._ask_permission)
-        self._start_inbox_polling()
-        telegram_bot.start()
-
-        # Load history
-        self._load_context()
-
-        # Onboarding
-        if settings.is_first_run():
-            self._show_welcome()
-            settings.complete_onboarding()
-
-        self.query_one("#chat-input", Input).focus()
-
-    def _show_welcome(self):
-        self._log_system(
-            "Welcome to Cell-2 — your personal AI agent.\n"
-            "Commands: /help, /memory, /status, /clear, /reset\n"
-            "Just type naturally. The agent handles the rest."
-        )
-
-    def on_input_submitted(self, event):
-        if event.input.id == "chat-input":
-            self._send()
-
-    def _send(self):
-        input_widget = self.query_one("#chat-input", Input)
-        text = input_widget.value.strip()
-        if not text:
-            return
-
-        input_widget.value = ""
-
-        # Handle commands
+    def _process_input(self, text: str):
         if text.startswith("/"):
             self._handle_command(text)
-            return
-
-        # Display user message
-        self._log_user(text)
-
-        # Send to brain
-        self._send_to_brain(text)
+        else:
+            self._add_user(text)
+            self._send_to_brain(text)
 
     def _send_to_brain(self, text: str):
         self._busy = True
-        self._log_thinking("thinking...")
+        self._add_system("thinking...")
+        self._draw()
 
         def worker():
             try:
                 response = process(text)
+            except Exception as e:
+                response = f"[SYSTEM ERROR] {e}"
             finally:
                 self._busy = False
 
-            self.call_from_thread(self._on_response, response)
+            # Remove "thinking..." message
+            self.messages = [m for m in self.messages if m != ("system", "thinking...")]
+
+            if response == "[CANCELLED]":
+                self.messages.append(("system", "(cancelled)"))
+            elif response.startswith("[SYSTEM ERROR]"):
+                self.messages.append(("system", response))
+            else:
+                self.messages.append(("agent", response))
+
+            self._draw()
 
         threading.Thread(target=worker, daemon=True).start()
-
-    def _on_response(self, response: str):
-        if response == "[CANCELLED]":
-            self._log_system("(cancelled)")
-        elif response.startswith("[SYSTEM ERROR]"):
-            self._log_system(response)
-        else:
-            self._log_agent(response)
 
     def _handle_command(self, cmd: str):
         parts = cmd.split(maxsplit=2)
         base = parts[0]
 
         if cmd == "/help":
-            self._log_system(
+            self._add_system(
                 "Commands:\n"
                 "  /help              — this message\n"
-                "  /memory            — list memory entries\n"
+                "  /memory            — list memory\n"
                 "  /memory search <q> — search memory\n"
                 "  /status            — agent status\n"
                 "  /clear             — clear context\n"
                 "  /reset             — factory reset\n"
-                "  /permission        — list permissions"
+                "  /permission        — list permissions\n"
+                "  /permission <t> <p>— set policy (always_allow/ask/always_deny)\n"
+                "  /quit              — exit"
             )
         elif cmd == "/clear":
-            import glob
-
             for f in ("context.json",):
                 p = os.path.join(os.path.dirname(__file__), "..", f)
                 if os.path.exists(p):
                     os.remove(p)
-            self.query_one("#chat-log", RichLog).clear()
-            self._log_system("Context cleared.")
+            self.messages = []
+            self._add_system("Context cleared.")
         elif cmd == "/reset":
             self._factory_reset()
-            self.query_one("#chat-log", RichLog).clear()
-            self._log_system("Factory reset complete.")
+            self.messages = []
+            self._add_system("Factory reset complete.")
         elif base == "/memory":
-            self._handle_memory(parts)
+            self._cmd_memory(parts)
         elif cmd == "/status":
-            self._handle_status()
+            self._cmd_status()
         elif base == "/permission":
-            self._handle_permission(parts)
+            self._cmd_permission(parts)
+        elif cmd == "/quit":
+            self._running = False
+            return
         else:
-            self._log_system(f"Unknown command: {cmd}. Type /help.")
+            self._add_system(f"Unknown: {cmd}. Type /help.")
 
-    def _handle_memory(self, parts: list):
+        self._draw()
+
+    def _cmd_memory(self, parts: list):
         mem = memory_engine()
         if len(parts) == 1:
             entries = mem.list_entries()
             if not entries:
-                self._log_system("Memory is empty.")
+                self._add_system("Memory is empty.")
                 return
             lines = [f"Memory ({len(entries)} entries):"]
             for e in entries:
                 emoji = {
-                    "core": "🔧",
-                    "semantic": "🧠",
-                    "episodic": "📅",
-                    "procedural": "🎯",
-                }.get(e.layer, "•")
-                lines.append(f"  {emoji} [{e.layer}] {e.filename}")
-            self._log_system("\n".join(lines))
+                    "core": "C",
+                    "semantic": "S",
+                    "episodic": "E",
+                    "procedural": "P",
+                }.get(e.layer, "?")
+                lines.append(f"  [{emoji}] {e.filename}")
+            self._add_system("\n".join(lines))
         elif parts[1] == "search" and len(parts) >= 3:
             query = parts[2]
             results = mem.search(query, top_k=10)
             if not results:
-                self._log_system(f"No results for '{query}'.")
+                self._add_system(f"No results for '{query}'.")
                 return
             lines = [f"Results for '{query}':"]
             for e in results:
                 lines.append(f"  [{e.layer}] {e.content[:80]}...")
-            self._log_system("\n".join(lines))
+            self._add_system("\n".join(lines))
         else:
-            self._log_system("Usage: /memory | /memory search <query>")
+            self._add_system("Usage: /memory | /memory search <query>")
 
-    def _handle_status(self):
+    def _cmd_status(self):
         mem = memory_engine()
         core = mem.get_core_profile()
         turn = memory_personality.get_turn()
         lam = memory_personality.lambda_m(turn)
         lines = [
-            "Cell-2 Status:",
-            f"  Turn: {turn}  (λ = {lam:.3f})",
+            "Status:",
+            f"  Turn: {turn}  (lambda={lam:.3f})",
             f"  Core: {core[:80] if core else '(empty)'}",
         ]
         for layer in ("semantic", "episodic", "procedural"):
             count = len(mem.list_entries(layer))
             lines.append(f"  {layer.capitalize()}: {count} entries")
-        self._log_system("\n".join(lines))
+        self._add_system("\n".join(lines))
 
-    def _handle_permission(self, parts: list):
+    def _cmd_permission(self, parts: list):
         if len(parts) == 1:
             lines = ["Permissions:"]
             for perm_type, policy in permissions.list_policies().items():
                 label = permissions.PERM_CATEGORIES.get(perm_type, perm_type)
                 lines.append(f"  {perm_type:20s} → {policy} ({label})")
-            self._log_system("\n".join(lines))
+            self._add_system("\n".join(lines))
         elif len(parts) == 3 and parts[1] in permissions.PERM_CATEGORIES:
             perm_type, policy = parts[1], parts[2]
             if policy not in ("always_allow", "ask", "always_deny"):
-                self._log_system("Policy: always_allow, ask, or always_deny")
+                self._add_system("Policy: always_allow, ask, or always_deny")
                 return
             permissions.set_policy(perm_type, policy)
-            self._log_system(f"{perm_type} → {policy}")
+            self._add_system(f"{perm_type} → {policy}")
         else:
-            self._log_system("Usage: /permission | /permission <type> <policy>")
-
-    # ---- Logging helpers ------------------------------------------------
-
-    def _log_user(self, text: str):
-        log = self.query_one("#chat-log", RichLog)
-        log.write(f"[bold white]▸ {text}[/bold white]")
-
-    def _log_agent(self, text: str):
-        log = self.query_one("#chat-log", RichLog)
-        log.write(f"[bold green]◆[/bold green] {text}")
-
-    def _log_system(self, text: str):
-        log = self.query_one("#chat-log", RichLog)
-        log.write(f"[dim]{text}[/dim]")
-
-    def _log_thinking(self, text: str):
-        log = self.query_one("#chat-log", RichLog)
-        log.write(f"[dim italic]  {text}[/dim italic]")
-
-    # ---- Context load ---------------------------------------------------
-
-    def _load_context(self):
-        history = context_store.get_all()
-        for m in history[-20:]:  # last 20 only
-            role = m.get("role")
-            content = m.get("content", "")
-            if role == "user":
-                self._log_user(content)
-            elif role == "assistant":
-                self._log_agent(content)
-            elif role == "system":
-                self._log_system(content)
-
-    # ---- Permissions ----------------------------------------------------
+            self._add_system("Usage: /permission | /permission <type> <policy>")
 
     def _ask_permission(self, operation: str, detail: str) -> str:
-        self._permission_event.clear()
-        self._permission_result = "skip"
+        # In CLI mode, auto-allow for now
+        return "allow"
 
-        def on_done(result):
-            self._permission_result = result if result else "skip"
-            self._permission_event.set()
+    def _add_user(self, text: str):
+        self.messages.append(("user", text))
+        self._draw()
 
-        # Simple text prompt instead of modal
-        self.call_from_thread(self._show_permission_prompt, operation, detail, on_done)
-        self._permission_event.wait()
-        return self._permission_result
+    def _add_system(self, text: str):
+        self.messages.append(("system", text))
 
-    def _show_permission_prompt(self, operation: str, detail: str, callback):
-        self._log_system(
-            f"Permission required: {operation}\n  {detail}\n  Allow? (y/n/always/never)"
-        )
-        # In CLI mode, we can't easily wait for input asynchronously
-        # So we auto-allow for now — user can set policies via /permission
-        callback("allow")
+    def _draw(self):
+        print(self.term.clear, end="")
 
-    # ---- Inbox polling --------------------------------------------------
+        height = self.term.height
+        width = self.term.width
+        log_height = height - 2  # reserve 2 lines for input
 
-    def _start_inbox_polling(self, interval: float = 2.0):
-        def loop():
-            while True:
-                time.sleep(interval)
-                msgs = inbox.drain()
-                for m in msgs:
-                    self.call_from_thread(self._log_system, f"[inbox] {m}")
+        # Calculate which messages to show
+        lines: list[tuple[str, str]] = []  # (style, text)
+        for role, content in self.messages:
+            for line in content.split("\n"):
+                # Wrap long lines
+                while line:
+                    chunk = line[:width]
+                    line = line[width:]
+                    lines.append((role, chunk))
 
-        threading.Thread(target=loop, daemon=True).start()
+        # Show last N lines that fit
+        visible = lines[-log_height:] if len(lines) > log_height else lines
 
-    # ---- Utils ----------------------------------------------------------
+        y = 0
+        for role, text in visible:
+            print(self.term.move(y, 0), end="")
+            if role == "user":
+                print(f"{self.term.bold_white}>{self.term.normal} {text}")
+            elif role == "agent":
+                print(f"{self.term.bold_green}<{self.term.normal} {text}")
+            elif role == "system":
+                print(f"{self.term.dim}  {text}{self.term.normal}")
+            y += 1
+
+        # Input line
+        print(self.term.move(height - 2, 0) + "─" * width)
+        print(self.term.move(height - 1, 0), end="")
+        print(f"> {self.input_buffer}", end="")
+        sys.stdout.flush()
 
     def _factory_reset(self):
         import glob, shutil
@@ -312,6 +350,10 @@ class CellCLI(App):
                 os.remove(f)
 
 
-def run() -> None:
-    app = CellCLI()
-    app.run()
+def run():
+    cli = CellCLI()
+    try:
+        cli.run()
+    except KeyboardInterrupt:
+        pass
+    print("\nGoodbye.")
