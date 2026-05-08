@@ -19,7 +19,7 @@ Cell is not a chatbot. It is your **personal AI agent** — the only AI tool you
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│  CELL-2 AGENT ARCHITECTURE                                  │
+│  CELL AGENT ARCHITECTURE                                    │
 │                                                             │
 │  ┌─────────────────────────────────────────────────────┐   │
 │  │  1. CORE BRAIN — Self-improving LLM agent            │   │
@@ -56,7 +56,7 @@ Cell is not a chatbot. It is your **personal AI agent** — the only AI tool you
 │  ┌─────────────────────────────────────────────────────┐   │
 │  │  5. AUTONOMY — Proactive background execution        │   │
 │  │  • Scheduler: recurring & one-shot tasks            │   │
-│  │  • Ambient ticks: periodic check-ins                    │   │
+│  │  • Ambient ticks: periodic check-ins                │   │
 │  │  • File watchers: react to changes                  │   │
 │  │  • Ambient ticks: proactive suggestions             │   │
 │  └─────────────────────────────────────────────────────┘   │
@@ -65,7 +65,7 @@ Cell is not a chatbot. It is your **personal AI agent** — the only AI tool you
 
 ---
 
-## Current State (v0.4)
+## Current State (v0.5)
 
 - [x] Self-improving brain (`self_improve`, dynamic functions)
 - [x] Sandboxed execution (subprocess + permission gate)
@@ -73,8 +73,10 @@ Cell is not a chatbot. It is your **personal AI agent** — the only AI tool you
 - [x] Scheduler engine (recurring & one-shot tasks)
 - [x] Telegram bot integration
 - [x] File attachments (text, images, PDFs)
-- [x] Textual TUI with onboarding wizard
-- [x] DeepSeek / OpenAI-compatible API support
+- [x] Blessed-based TUI with onboarding wizard
+- [x] **Multi-provider** — Anthropic / OpenAI / Gemini / DeepSeek / Ollama
+- [x] **Native vision** — multimodal API (Claude Vision / GPT-4V / Gemini)
+- [x] **MCP client** — official Python SDK, tools auto-injected
 - [x] **PersonaVLM-style four-layer memory** (Core, Semantic, Episodic, Procedural)
 - [x] **Embedding retrieval** (multilingual sentence-transformer + keyword fallback)
 - [x] **Big Five personality** with cosine-decay EMA momentum
@@ -90,7 +92,7 @@ Cell is not a chatbot. It is your **personal AI agent** — the only AI tool you
 
 ## Phase 1: The Agent Core (v0.2 — v0.4)
 
-Cíl: Cell se stane použitelným AI agentem co umí pracovat autonomně — pamatuje si vás, browsuje web, píše kód, spravuje váš život.
+Goal: Cell becomes a usable AI agent that can work autonomously — remembers you, browses the web, writes code, manages your life.
 
 ### v0.2 — "Memory & Identity" ✓ shipped
 
@@ -103,15 +105,15 @@ Actions are **agent-driven** — the user writes normal text, the agent decides 
 - [x] **Code sandbox** — `core/sandbox.py`
   - Agent can execute Python in isolated venv on demand
   - Used for: calculations, data analysis, testing code, scraping
-  - User says: *"Spočítej mi faktoriál 100"* → agent uses sandbox
+  - User says: *"Calculate factorial of 100"* → agent uses sandbox
 
 - [x] **Browser control** — `core/browser.py`
   - `fetch_url()` — lightweight requests + BeautifulSoup
   - `search_web()` — DuckDuckGo search
-  - User says: *"Jaké je počasí v Praze?"* → agent fetches weather site
+  - User says: *"What's the weather in Prague?"* → agent fetches weather site
 
 - [x] **Smart scheduler** — `core/smart_scheduler.py`
-  - Agent parses natural language: *"každé ráno v 8"*, *"zítra v 15:00"*, *"za 5 minut"*
+  - Agent parses natural language: *"every morning at 8"*, *"tomorrow at 3pm"*, *"in 5 minutes"*
   - Creates scheduled tasks autonomously
 
 - [x] **Permission system v2** — granular access control
@@ -120,229 +122,229 @@ Actions are **agent-driven** — the user writes normal text, the agent decides 
 
 ### v0.4 — "Proactive Agent" ✓ shipped
 
-Cíl: **Cell přestává být reaktivní.** Sám si všimne, sám se ozve, sám něco navrhne.
+Goal: **Cell stops being reactive.** It notices things on its own, speaks up on its own, suggests things on its own.
 
-- [x] **Smart scheduler v2** — přirozený jazyk:
-  - "každé ráno shrň maily a ulož do Obsidianu"
-  - "každá hodina", "zítra v 15:00", "za 5 minut"
+- [x] **Smart scheduler v2** — natural language:
+  - "every morning summarize emails and save to Obsidian"
+  - "every hour", "tomorrow at 3pm", "in 5 minutes"
   - `core/smart_scheduler.py` — LLM parsing + heuristic fallback
-  - Příkaz: `/schedule <description>`
-- [x] **Ambient ticks** — pravidelný tick, který nakopne LLM bez user inputu
-  - Loop v `core/core.py` čte interval ze settings při každém ticku (live reload)
-  - LLM se rozhodne: *něco říct?* / *něco udělat?* / *mlčet?* (silent return = no-op)
-  - Anti-spam guards: cooldown po user msg, quiet hours, daily cap, dedup přes memory_store
-  - State persistuje (`ambient.last_tick_ts`, `tick_count`, `tick_date`) — přežije restart
-- [x] **Ambient intelligence** — *proaktivní* agent (hlavní cíl v0.4)
-  - `build_ambient_input()` injektuje real-time snapshot: `scheduler.list_tasks()`, top procedural goals, recent episodic events, current time
-   - Decision layer řízen promptem (proactive: surfacing goals, memory connections, patterns)
-  - Doručení přes `inbox.post(...)` → TUI banner / Telegram push
-- [x] **TUI ovládání** — `/ambient on|off|status|now`
-- [ ] **File watcher triggers** *(nice-to-have, low priority)* — reakce na změny souborů
+  - Command: `/schedule <description>`
+- [x] **Ambient ticks** — periodic tick that prompts the LLM without user input
+  - Loop in `core/core.py` reads interval from settings on every tick (live reload)
+  - LLM decides: *say something?* / *do something?* / *stay silent?* (silent return = no-op)
+  - Anti-spam guards: cooldown after user msg, quiet hours, daily cap, dedup via memory_store
+  - State persists (`ambient.last_tick_ts`, `tick_count`, `tick_date`) — survives restart
+- [x] **Ambient intelligence** — *proactive* agent (main goal of v0.4)
+  - `build_ambient_input()` injects real-time snapshot: `scheduler.list_tasks()`, top procedural goals, recent episodic events, current time
+  - Decision layer driven by prompt (proactive: surfacing goals, memory connections, patterns)
+  - Delivery via `inbox.post(...)` → TUI banner / Telegram push
+- [x] **TUI controls** — `/ambient on|off|status|now`
+- [ ] **File watcher triggers** *(nice-to-have, low priority)* — react to file changes
 
-→ *Cell pracuje, i když u něj nejsi.*
+→ *Cell works even when you're not at the keyboard.*
 
 ---
 
 ## Phase 2: Hermes Parity & Beyond (v0.4.1 — v0.8)
 
-**Strategická pozice:** Hermes Agent (Nous Research) a OpenClaw jsou dnešní laťka pro autonomní AI agenty. Cílem fáze 2 je se s Hermesem nejdřív vyrovnat (v0.5–v0.7) a pak ho předehnat (v0.8) skrze to, co Cell dělá unikátně: čtyřvrstvá paměť, Big Five momentum, Core/Brain isolation s `self_improve`. Před tím malý refaktor (v0.4.1), aby proaktivita byla **opravdu** proaktivní.
+**Strategic position:** Hermes Agent (Nous Research) and OpenClaw are today's bar for autonomous AI agents. The goal of phase 2 is to first reach parity with Hermes (v0.5–v0.7) and then surpass it (v0.8) through what Cell does uniquely: four-layer memory, Big Five momentum, Core/Brain isolation with `self_improve`. Before that, a small refactor (v0.4.1) so proactivity is **actually** proactive.
 
-### v0.4.1 — "Proactivity" (sjednocení ambient, uvolnění promptu) ✓ shipped
+### v0.4.1 — "Proactivity" (unify ambient, loosen the prompt) ✓ shipped
 
-Cíl: zjednodušit model proaktivity a udělat ji opravdovou.
+Goal: simplify the proactivity model and make it real.
 
-V kódu jsou heartbeat a ambient **už dnes jedna smyčka** (`_run_ambient_tick` v `core/core.py:332` — `/heartbeat` jen volá `_run_ambient_tick(force=True)`). Rozdvojené je to jen v dokumentaci a v UX. Navíc je prompt v `build_ambient_input` (`core/chat.py:286`) moc konzervativní ("act only if genuinely due, missed, or broken... do not invent work, do not greet, do not summarize") — to zabíjí smysl proaktivity.
+In code, heartbeat and ambient are **already a single loop today** (`_run_ambient_tick` in `core/core.py:332` — `/heartbeat` just calls `_run_ambient_tick(force=True)`). The split exists only in documentation and UX. On top of that, the prompt in `build_ambient_input` (`core/chat.py:286`) is too conservative ("act only if genuinely due, missed, or broken... do not invent work, do not greet, do not summarize") — that kills the point of proactivity.
 
-- [x] **Jeden název: ambient** — heartbeat zmizí z dokumentace i z TUI/Web
-  - TUI: `/ambient on|off|status` zůstává; `/ambient now` nahrazuje `/heartbeat`
-  - Web UI: jeden ovládací panel, jednotné názvosloví
-  - README + ROADMAP: jeden koncept, jedna sekce
-- [x] **Loosen the prompt** — `build_ambient_input` v `core/chat.py:286`
-  - Odstraněno "Do not invent work, do not greet, do not summarize"
-  - Přidána pozitivní instrukce: aktivně surface user-relevant info na základě paměti a vzorů, ne jen čekat na deadline
-  - Anti-spam guards (cooldown, quiet hours, daily cap) zůstávají — uvolnění je v *povaze* akce, ne ve frekvenci
-- [x] **Proactive triggers** — co všechno smí ambient sám iniciovat
-  - Připomenutí goalu z procedural memory ("říkal jsi, že chceš týdně review — uděláme to teď?")
-  - Souvislost mezi dnešním kontextem a starší pamětí ("zmínil jsi minulý měsíc X, dnes to může souviset s Y")
-  - Návrh next action po dokončení velkého tasku
-  - Surface relevantního obsahu z `[AMBIENT]` snapshotu, ne jen reakce na vypršené tasky
-- [x] **Predictive ambient** *(přesunuto z v0.8)*
-  - Časové vzory: "user každé pondělí v 9:00 řeší maily" → připrav summary předem
-  - Anomálie: "user nezaregistroval ranní mail 3 dny" → soft check-in
-  - Implementace: frequency tracker v `memory_store` (`ambient.patterns.*`) + detekce v `_ambient_state_snapshot`
+- [x] **One name: ambient** — heartbeat disappears from docs and from TUI/Web
+  - TUI: `/ambient on|off|status` stays; `/ambient now` replaces `/heartbeat`
+  - Web UI: one control panel, unified naming
+  - README + ROADMAP: one concept, one section
+- [x] **Loosen the prompt** — `build_ambient_input` in `core/chat.py:286`
+  - Removed "Do not invent work, do not greet, do not summarize"
+  - Added positive instruction: actively surface user-relevant info based on memory and patterns, don't just wait for a deadline
+  - Anti-spam guards (cooldown, quiet hours, daily cap) stay — the loosening is in the *nature* of the action, not the frequency
+- [x] **Proactive triggers** — what ambient is allowed to initiate on its own
+  - Reminder of a goal from procedural memory ("you said you wanted a weekly review — shall we do it now?")
+  - Connection between today's context and older memory ("you mentioned X last month, today it might relate to Y")
+  - Suggest next action after completing a big task
+  - Surface relevant content from `[AMBIENT]` snapshot, not just react to expired tasks
+- [x] **Predictive ambient** *(moved from v0.8)*
+  - Time patterns: "user handles emails every Monday at 9:00" → prepare a summary in advance
+  - Anomalies: "user hasn't checked morning email for 3 days" → soft check-in
+  - Implementation: frequency tracker in `memory_store` (`ambient.patterns.*`) + detection in `_ambient_state_snapshot`
 
-→ *Cell se ozve, když má co říct — ne jen když mu něco "uniklo".*
+→ *Cell speaks up when it has something to say — not just when something "slipped".*
 
 ---
 
-### Co dnes chybí oproti Hermes (audit ke 2026-05)
+### Where Cell stands vs Hermes (audit, 2026-05)
 
-| Oblast | Hermes | Cell dnes |
+| Area | Hermes | Cell today |
 |---|---|---|
-| Multi-model | ano (model-agnostic) | DeepSeek / OpenAI / Anthropic / Gemini / Ollama |
-| Vision | nativní | nativní multimodal API |
-| MCP klient | ano | `core/mcp_client.py` |
-| Browser automation | full (multi-backend) | jen `fetch_url` (statický HTML) |
-| Voice I/O | STT + TTS + Discord voice | chybí |
-| Subagenty | isolated, parallel | chybí |
-| Batch processing | ano | chybí |
-| Image generation | ano | chybí |
-| Skill marketplace | agentskills.io standard | `self_improve` lokálně, bez sdílení |
+| Multi-model | yes (model-agnostic) | DeepSeek / OpenAI / Anthropic / Gemini / Ollama |
+| Vision | native | native multimodal API |
+| MCP client | yes | `core/mcp_client.py` |
+| Browser automation | full (multi-backend) | only `fetch_url` (static HTML) |
+| Voice I/O | STT + TTS + Discord voice | missing |
+| Subagents | isolated, parallel | missing |
+| Batch processing | yes | missing |
+| Image generation | yes | missing |
+| Skill marketplace | agentskills.io standard | `self_improve` locally, no sharing |
 | Multi-channel | TG / Discord / Slack / WA / Signal / Email | TUI / TG / Web |
 
 ### v0.5 — "Brain Stem" (multi-model + vision + MCP) ✓ shipped
 
-Cíl: rozbít závislost na DeepSeek a otevřít se MCP ekosystému.
+Goal: break the DeepSeek dependency and open up to the MCP ecosystem.
 
-- [x] **Multi-provider proxy** — refaktor `core/proxy.py` na adapter pattern
-  - Anthropic (Claude 4.x), OpenAI, Gemini, DeepSeek, llama.cpp lokálně
-  - Per-turn volba modelu (`/model claude-opus-4-7`)
-  - Rozdílné modely pro brain vs. curator (cheap na kuraci, smart na rozhodnutí)
-  - BYOK přes `config.yaml`, `~/.cell-2/keys.json`
-- [x] **Native vision** — `image/*` MIME jde rovnou do multimodálního API
-  - Claude Vision / GPT-4V / Gemini, žádný base64 fallback
-  - Nahrazuje `_format_file_attachment` image větev v `core/core.py`
-- [x] **MCP klient** — `core/mcp_client.py`
-  - Podpora oficiálního `mcp` Pythonského SDK
-  - Tools z MCP serverů se automaticky objeví v brain tool listu
-  - Per-server konfigurace v `config.yaml` (gh, gmail, fs, atd.)
-  - Permission gate respektuje per-server scope
+- [x] **Multi-provider proxy** — refactor `core/proxy.py` to adapter pattern
+  - Anthropic (Claude 4.x), OpenAI, Gemini, DeepSeek, llama.cpp local
+  - Per-turn model choice (`/model claude-opus-4-7`)
+  - Different models for brain vs. curator (cheap for curation, smart for decisions)
+  - BYOK via `config.yaml`, `~/.cell-2/keys.json`
+- [x] **Native vision** — `image/*` MIME goes straight into the multimodal API
+  - Claude Vision / GPT-4V / Gemini, no base64 fallback
+  - Replaces `_format_file_attachment` image branch in `core/core.py`
+- [x] **MCP client** — `core/mcp_client.py`
+  - Support for the official Python `mcp` SDK
+  - Tools from MCP servers automatically appear in the brain tool list
+  - Per-server config in `config.yaml` (gh, gmail, fs, etc.)
+  - Permission gate respects per-server scope
 
-→ *Cell přestává být DeepSeek-only a otevírá se MCP ekosystému.*
+→ *Cell is no longer DeepSeek-only and opens up to the MCP ecosystem.*
 
 ### v0.6 — "Hands, Eyes, Voice" (browser, voice, image gen)
 
-Cíl: dohnat Hermes v "akčních" featurách.
+Goal: catch up to Hermes on "action" features.
 
-- [ ] **Full browser** — `core/browser_full.py` přes Playwright
+- [ ] **Full browser** — `core/browser_full.py` via Playwright
   - JS rendering, login flows, form filling, screenshot
-  - `fetch_url` zůstává jako lightweight default; nový `browse(url, actions=[...])` pro plnou interakci
-  - Headless / headed přepínač pro debugging
-- [ ] **Voice I/O** *(zvážit odložení za v0.8 — nízká diferenciace, jen catch-up vůči Hermes)*
-  - **STT:** Whisper local (CPU+GPU) → text v TUI / Web / Telegram
-  - **TTS:** Piper / Coqui → hlasové odpovědi
-  - Pozdější: Discord voice channel (live conversation)
-- [ ] **Image generation** — `generate_image(prompt)` přes DALL·E / Replicate / lokální Stable Diffusion
-- [ ] **Document parsing** — DOCX, XLSX, nativní PDF (`pypdf`, `python-docx`, `openpyxl`)
-- [ ] **Audio messages** — Cell pošle voice memo na Telegram / WhatsApp
-- [ ] **Cost-aware model routing** — per-turn classifier (trivial / medium / complex) → nejlevnější schopný model
-  - Trivial (pozdrav, krátká odpověď) → Haiku / DeepSeek-chat / lokální
-  - Medium (běžný turn s memory retrieval) → Sonnet / DeepSeek-reasoner
-  - Complex (multi-tool, plánování, `self_improve`) → Opus / GPT-5
-  - Klasifikátor: heuristiky (délka, počet tools, klíčová slova) + lehký LLM scorer; cache podle hashů promptu
-  - Curator už používá levný model — zobecnit pattern na celý chat; očekávané úspory 5–10× bez ztráty kvality
-- [ ] **Personality-aware response shaping** *(přesunuto z v0.8, low effort high impact)*
-  - Big Five vektor uživatele řídí styl odpovědi: high Neuroticism → měkčí ton; high Conscientiousness → struktura, bullety
-  - Per-uživatelský prompt overlay v `build_input` — žádný velký refaktor, jen vrstva nad systémovým promptem
-  - Posiluje feedback loop pro EMA momentum: lepší shaping → přesnější user reactions → přesnější persona
+  - `fetch_url` stays as the lightweight default; new `browse(url, actions=[...])` for full interaction
+  - Headless / headed switch for debugging
+- [ ] **Voice I/O** *(consider deferring past v0.8 — low differentiation, only catch-up vs Hermes)*
+  - **STT:** Whisper local (CPU+GPU) → text in TUI / Web / Telegram
+  - **TTS:** Piper / Coqui → voice replies
+  - Later: Discord voice channel (live conversation)
+- [ ] **Image generation** — `generate_image(prompt)` via DALL·E / Replicate / local Stable Diffusion
+- [ ] **Document parsing** — DOCX, XLSX, native PDF (`pypdf`, `python-docx`, `openpyxl`)
+- [ ] **Audio messages** — Cell sends a voice memo on Telegram / WhatsApp
+- [ ] **Cost-aware model routing** — per-turn classifier (trivial / medium / complex) → cheapest capable model
+  - Trivial (greeting, short answer) → Haiku / DeepSeek-chat / local
+  - Medium (regular turn with memory retrieval) → Sonnet / DeepSeek-reasoner
+  - Complex (multi-tool, planning, `self_improve`) → Opus / GPT-5
+  - Classifier: heuristics (length, tool count, keywords) + lightweight LLM scorer; cache by prompt hash
+  - Curator already uses a cheap model — generalize the pattern across the whole chat; expected savings 5–10× without quality loss
+- [ ] **Personality-aware response shaping** *(moved from v0.8, low effort high impact)*
+  - User's Big Five vector drives reply style: high Neuroticism → softer tone; high Conscientiousness → structure, bullets
+  - Per-user prompt overlay in `build_input` — no big refactor, just a layer on top of the system prompt
+  - Strengthens the EMA momentum feedback loop: better shaping → more accurate user reactions → more accurate persona
 
-→ *Cell má všechny smysly i ruce, které má Hermes — a navíc volí "kolik mozku" si dovolí.*
+→ *Cell has all the senses and hands Hermes has — and chooses "how much brain" to spend.*
 
-### v0.7 — "Subagents & Reach" (paralelizace, kanály, marketplace)
+### v0.7 — "Subagents & Reach" (parallelization, channels, marketplace)
 
-Cíl: paralelní výpočet + dosažitelnost odkudkoli + sdílení skillů.
+Goal: parallel compute + reachable from anywhere + skill sharing.
 
 - [ ] **Subagents** — `runner.spawn_subagent(task, context)`
-  - Wrapper nad `run_brain_subprocess` s izolovaným kontextem
-  - Vrací výsledek bez kontaminace hlavního turnu
-  - Použití: paralelní research, batch zpracování, "delegate to specialist"
+  - Wrapper over `run_brain_subprocess` with isolated context
+  - Returns the result without contaminating the main turn
+  - Use: parallel research, batch processing, "delegate to specialist"
 - [ ] **Batch processing** — `cell2 batch <prompts.jsonl>` CLI
-  - Stovky / tisíce promptů paralelně, JSON output
+  - Hundreds / thousands of prompts in parallel, JSON output
   - Per-item subagent
-- [ ] **Discord bot** — analogie `core/telegram_bot.py`
+- [ ] **Discord bot** — analogue of `core/telegram_bot.py`
 - [ ] **Slack bot** — workspace integration
-- [ ] **WhatsApp** — Business API (později i Signal, iMessage)
+- [ ] **WhatsApp** — Business API (later Signal, iMessage)
 - [ ] **Email channel** — IMAP poll + SMTP send
-- [ ] **REST API stabilizace** — dokončit `/api/*`, OpenAPI spec
+- [ ] **REST API stabilization** — finalize `/api/*`, OpenAPI spec
 - [ ] **Webhook receivers** — GitHub, Sentry, Linear → ambient triggers
 - [ ] **Skill registry**
-  - `brain/functions/*.py` → exportovatelný balíček (manifest + deps + spec + hash + autor)
-  - Kompatibilita s agentskills.io (pokud spec dovolí)
+  - `brain/functions/*.py` → exportable package (manifest + deps + spec + hash + author)
+  - Compatible with agentskills.io (if the spec allows)
   - `cell2 skills export <name>` / `cell2 skills install <url>`
-  - **Trust tiers** — importovaný skill se nepřidává rovnou do `brain/functions/`
-    - Tier 0 (untrusted): běh v izolovaném subprocess, network=deny, fs=read-only sandbox dir
-    - Tier 1 (probationary): po N úspěšných runech bez chyby/permission breach se povýší
-    - Tier 2 (trusted): manuálně schválené uživatelem, plné permissions per manifest scope
-    - Provenance: hash + zdroj URL + datum instalace v `~/.cell-2/skills.json`
+  - **Trust tiers** — an imported skill is not added directly to `brain/functions/`
+    - Tier 0 (untrusted): runs in an isolated subprocess, network=deny, fs=read-only sandbox dir
+    - Tier 1 (probationary): promoted after N successful runs without errors / permission breaches
+    - Tier 2 (trusted): manually approved by user, full permissions per manifest scope
+    - Provenance: hash + source URL + install date in `~/.cell-2/skills.json`
 
 → *Cell == Hermes feature parity.*
 
-### v0.8 — "Beyond Hermes" (diferenciace)
+### v0.8 — "Beyond Hermes" (differentiation)
 
-Cíl: využít unikátních silných stránek Cell a předehnat Hermes ve čtyřech osách: paměť, bezpečnost self-improvementu, predikce, lokální AI.
+Goal: leverage Cell's unique strengths and surpass Hermes on four axes: memory, self-improvement safety, prediction, local AI.
 
-- [ ] **Self-improving brain v2** — `self_improve` jako produkční pipeline, ne hraní
-  - **LLM-as-reviewer** — nezávislá instance čte každou navrženou změnu (security, bugs, regrese)
-  - **Test-driven** — vygenerovaná funkce **musí** přijít s testem; test běží v sandboxu před merge; fail → starý kód zůstává
-  - **Adversarial subagent** — druhá LLM s rolí "red team" zkouší rozbít/prolomit změnu (edge cases, injection, infinite loop)
-  - **Regression memory** — historie všeho, co kdy `self_improve` rozbil; injektuje se do promptu reviewera ("tohle už jsi minule rozbil — nezkoušej znova")
-  - **Lineage tracking** — každý generovaný tool má parent pointer; periodické pruning obsoletních verzí
-- [ ] **Sleep cycle / dream pass** — noční konsolidace paměti *(killer feature, žádný cloud agent to nedělá)*
-  - V quiet hours agent projede uzavřené chapters a provede:
-    - **Contradiction sweep** — najde rozpory v Semantic ("user pije kávu" vs. "user nepije kávu") a vyřeší přes timestamp + frequency
-    - **Redundancy merge** — sloučí duplicitní/podobné fakty (cosine similarity nad embeddings)
-    - **Meta-summary** — z N kapitol vygeneruje vyšší abstrakci ("posledních 14 dní user řešil refaktor X")
-    - **Goal review** — projede Procedural, označí stagnující/dokončené goaly, navrhne update
-  - Implementace: rozšíření `core/memory_curator.py` o `consolidate()` pass; spouští se přes ambient loop v quiet hours, batch over chapters since last consolidation
-  - Dream output je vlastní vrstva (`memory/dreams/`), uživatel ji vidí přes `/memory dreams`
-- [ ] **OS-level ambient signals** *(přesunuto z v1.5 — bez tohohle je "ambient" jen časovač)*
-  - **Clipboard watcher** — když user copy-paste velký text, ambient může zareagovat ("vypadá to jako právní dokument, mám připravit shrnutí?")
-  - **Active window observer** — Cell ví, na co se user dívá (PDF, IDE, browser tab) → context bez ptaní
-  - **Recent files** — co user otevřel/upravil za poslední hodinu → ambient signal pro proactive trigger
-  - Implementace: lehký background daemon (Windows: `pywin32`; macOS: AppleScript / `Quartz`; Linux: `xdotool`/`wmctrl`)
-  - Privacy gate: per-app whitelist, klipboard nikdy do trvalé paměti bez explicitního souhlasu
+- [ ] **Self-improving brain v2** — `self_improve` as a production pipeline, not a toy
+  - **LLM-as-reviewer** — independent instance reads every proposed change (security, bugs, regressions)
+  - **Test-driven** — generated function **must** ship with a test; the test runs in the sandbox before merge; fail → old code stays
+  - **Adversarial subagent** — second LLM in a "red team" role tries to break/exploit the change (edge cases, injection, infinite loop)
+  - **Regression memory** — history of everything `self_improve` ever broke; injected into the reviewer's prompt ("you broke this last time — don't try again")
+  - **Lineage tracking** — every generated tool has a parent pointer; periodic pruning of obsolete versions
+- [ ] **Sleep cycle / dream pass** — nightly memory consolidation *(killer feature — no cloud agent does this)*
+  - During quiet hours the agent walks through closed chapters and runs:
+    - **Contradiction sweep** — finds contradictions in Semantic ("user drinks coffee" vs. "user doesn't drink coffee") and resolves via timestamp + frequency
+    - **Redundancy merge** — merges duplicate / similar facts (cosine similarity over embeddings)
+    - **Meta-summary** — from N chapters generates a higher-level abstraction ("over the last 14 days the user worked on refactor X")
+    - **Goal review** — walks Procedural, marks stagnating / completed goals, suggests updates
+  - Implementation: extend `core/memory_curator.py` with a `consolidate()` pass; runs via the ambient loop in quiet hours, batched over chapters since last consolidation
+  - Dream output is its own layer (`memory/dreams/`), user views it via `/memory dreams`
+- [ ] **OS-level ambient signals** *(moved from v1.5 — without this, "ambient" is just a timer)*
+  - **Clipboard watcher** — when the user copy-pastes large text, ambient may react ("looks like a legal doc, want me to prepare a summary?")
+  - **Active window observer** — Cell knows what the user is looking at (PDF, IDE, browser tab) → context without asking
+  - **Recent files** — what the user opened / modified in the last hour → ambient signal for a proactive trigger
+  - Implementation: lightweight background daemon (Windows: `pywin32`; macOS: AppleScript / `Quartz`; Linux: `xdotool`/`wmctrl`)
+  - Privacy gate: per-app whitelist, clipboard never persisted without explicit consent
 - [ ] **Persona forking** — "coding assistant", "researcher", "therapist" personas
-  - Sdílená Core paměť (kdo user je) + per-persona Procedural & Episodic
+  - Shared Core memory (who the user is) + per-persona Procedural & Episodic
   - `/persona researcher`
-- [ ] **Local fine-tuning** — uživatelská data → osobní LoRA
-  - Fine-tune lokální Llama / Qwen na user-specific patterns (data nikdy neopouští stroj)
-  - Cell se učí "jak ten konkrétní člověk myslí" — Hermes tohle nedělá
-- [ ] **Memory provenance & undo** — každý `memory_engine.add()` má source pointer
-  - *"Proč si Cell myslí, že mám alergii na jahody?"* → ukáže větu z konverzace 3 týdny zpět
-  - `/memory revert <id>` — undo konkrétní paměti bez narušení sousedů
-- [ ] **Encrypted-at-rest by default** — `memory/`, `context.json`, `chats/` šifrované
-  - Master passphrase nebo OS keychain
-  - Zero-knowledge: bez klíče ani Cell sám nečte staré stavy
-- [ ] **Multi-device E2EE sync** — vlastní relay nebo Syncthing wrapper
-  - Telefon ↔ laptop ↔ server: stejná persona, stejná paměť
-  - Konflikt resolution: "newest semantic, append-merge episodic"
+- [ ] **Local fine-tuning** — user data → personal LoRA
+  - Fine-tune a local Llama / Qwen on user-specific patterns (data never leaves the machine)
+  - Cell learns "how this specific person thinks" — Hermes doesn't do this
+- [ ] **Memory provenance & undo** — every `memory_engine.add()` has a source pointer
+  - *"Why does Cell think I'm allergic to strawberries?"* → shows the sentence from a conversation 3 weeks ago
+  - `/memory revert <id>` — undo a specific memory without touching neighbors
+- [ ] **Encrypted-at-rest by default** — `memory/`, `context.json`, `chats/` encrypted
+  - Master passphrase or OS keychain
+  - Zero-knowledge: without the key, even Cell itself cannot read old state
+- [ ] **Multi-device E2EE sync** — own relay or Syncthing wrapper
+  - Phone ↔ laptop ↔ server: same persona, same memory
+  - Conflict resolution: "newest semantic, append-merge episodic"
 
-→ *Cell už není kopie Hermes — má hlubší paměť, sleep cycle, bezpečný self-improvement s testy a red-teamem, ambient OS signály a lokální fine-tuning.*
+→ *Cell is no longer a Hermes clone — it has deeper memory, a sleep cycle, safe self-improvement with tests and a red team, ambient OS signals, and local fine-tuning.*
 
 ---
 
 ## Phase 3: Production (v1.0)
 
-Cíl: produkt ready pro široké použití.
+Goal: a product ready for wide use.
 
 ### v1.0 — "The Workstation"
-- [ ] **Docker support** — celý Cell jako Docker container
-  - `docker run -it cell2` — okamžitý start
-  - Persistentní volume pro `memory/`, `context.json`, `chats/`, config
-  - Ideální pro 24/7 serverové nasazení; docker-compose s Redis/Postgres
-- [ ] **Optional GUI** — lehké nativní GUI; TUI zůstává primární
+- [ ] **Docker support** — full Cell as a Docker container
+  - `docker run -it cell2` — instant start
+  - Persistent volume for `memory/`, `context.json`, `chats/`, config
+  - Ideal for 24/7 server deployment; docker-compose with Redis/Postgres
+- [ ] **Optional GUI** — lightweight native GUI; TUI stays primary
 - [ ] **Installer & auto-update** — Windows MSI / macOS DMG / Linux AppImage
-- [ ] **Companion app (macOS)** — menubar access, native notifikace
-- [ ] **Local LLM by default** — llama.cpp nebo similar; cloud je fallback
-- [ ] **Agent marketplace** — sdílení a objevování skill balíčků (rozšíření v0.7 registry)
+- [ ] **Companion app (macOS)** — menubar access, native notifications
+- [ ] **Local LLM by default** — llama.cpp or similar; cloud as fallback
+- [ ] **Agent marketplace** — sharing and discovery of skill packages (extension of v0.7 registry)
 
-→ *Teď je to produkt pro normální lidi.*
+→ *Now it's a product for normal people.*
 
 ---
 
 ## Phase 4: Advanced (v1.5+)
 
 ### v1.5 — "Ambient Intelligence v2"
-- [ ] **Native system notifications** — Cell push přes OS notification center (Windows toast, macOS NC, Linux libnotify)
-- [ ] **Advanced analytics** — analýza chování, produktivity, návyků uživatele
-- [ ] **Ambient action proposals** — nejen "říct něco", ale "udělat něco" s confirm dialog (např. po copy-paste auto-připrav response template)
+- [ ] **Native system notifications** — Cell pushes via OS notification center (Windows toast, macOS NC, Linux libnotify)
+- [ ] **Advanced analytics** — analysis of user behavior, productivity, habits
+- [ ] **Ambient action proposals** — not just "say something", but "do something" with a confirm dialog (e.g., after copy-paste auto-prepare a response template)
 
 ### v1.6 — "Team Mode"
 - [x] **Thread system** *(shipped in v0.5 web UI)*
-- [ ] **Team Mode** — více uživatelů, sdílené session
-- [ ] **Shared sessions** — dva lidé + agent v jedné konverzaci
+- [ ] **Team Mode** — multiple users, shared session
+- [ ] **Shared sessions** — two people + agent in one conversation
 
-→ *Teď to umí i týmovou spolupráci.*
+→ *Now it does team collaboration too.*
 
 ---
 
@@ -354,7 +356,7 @@ Cell's memory is not a dump. It is a **living, layered mind**.
 
 The **Space** is your single, infinite chat — it never resets, never branches, never rolls over. You always pick up where you left off.
 
-Inside that infinite Space, Cell silently breaks the timeline into **chapters**. A chapter is just a stretch of turns separated from the next by a long pause (default: 60 minutes idle). Chapters are *internal* — you don't see them as anything other than a brief `🧠 Session #N closed — captured X memory items` notice when one ends.
+Inside that infinite Space, Cell silently breaks the timeline into **chapters**. A chapter is just a stretch of turns separated from the next by a long pause (default: 60 minutes idle). Chapters are *internal* — you don't see them as anything other than a brief `Session #N closed — captured X memory items` notice when one ends.
 
 Why chapters? Two updates run on different rhythms:
 
@@ -374,7 +376,7 @@ Threads (v1.6) will be *named* chapters you can spawn explicitly.
 
 ### Why RAG Alone Sucks
 
-Classic RAG cannot delete or update. If you say "I drink mango" and later "I drink lemon", RAG stores BOTH. When you ask "what should I drink?", it suggests mango because it was mentioned more often. Cell overwrites facts directly in Semantic layer.
+Classic RAG cannot delete or update. If you say "I drink mango" and later "I drink lemon", RAG stores BOTH. When you ask "what should I drink?", it suggests mango because it was mentioned more often. Cell overwrites facts directly in the Semantic layer.
 
 ### Personality Momentum (λ)
 

@@ -1,21 +1,21 @@
 # Cell — Whitepaper
 
-> *"Vesmír je zákon. Země je život."*
+> *"The Universe is law. The Earth is life."*
 
 ---
 
-## 1. Vize
+## 1. Vision
 
-Cell je self-improving AI agent — systém schopný autonomního fungování, rozšiřování vlastních schopností a dlouhodobé paměti. Na rozdíl od statických agentů (jako Hermes Agent nebo OpenClaw) si Cell může přepisovat vlastní zdrojový kód, vytvářet nové funkce a plánovat vlastní úlohy — vše v rámci pevně daných hranic, které zajišťuje neměnné jádro systému.
+Cell is a self-improving AI agent — a system capable of autonomous operation, expanding its own capabilities, and long-term memory. Unlike static agents (such as Hermes Agent or OpenClaw), Cell can rewrite its own source code, create new functions, and schedule its own tasks — all within fixed boundaries enforced by an immutable system core.
 
-Základní analogie: **Vesmír a Země.**
+The core analogy: **Universe and Earth.**
 
-- **Vesmír (Core)** — neměnné zákony, fyzika systému. Nezáleží na tom, co se děje uvnitř. Nelze ho přepsat.
-- **Země (Brain)** — živá civilizace. Roste, mění se, může sama sebe zničit, ale také sama sebe přestavět.
+- **Universe (Core)** — immutable laws, the physics of the system. It does not care what happens inside. It cannot be rewritten.
+- **Earth (Brain)** — a living civilization. It grows, changes, can destroy itself, but can also rebuild itself.
 
 ---
 
-## 2. Architektura
+## 2. Architecture
 
 ```
 ┌─────────────────────────────────────────────────┐
@@ -28,12 +28,12 @@ Základní analogie: **Vesmír a Země.**
 │       │              │                │         │
 │  ┌────▼──────────────▼────────────────▼───────┐ │
 │  │              Context Store                 │ │
-│  │         (permanentní, blockchain-like)     │ │
+│  │         (permanent, blockchain-like)       │ │
 │  └────────────────────┬───────────────────────┘ │
 │                       │                         │
 │  ┌────────────────────▼───────────────────────┐ │
 │  │                  Proxy                     │ │
-│  │       (LLM API komunikace, klíče)          │ │
+│  │       (LLM API communication, keys)        │ │
 │  └────────────────────┬───────────────────────┘ │
 └───────────────────────┼─────────────────────────┘
                         │
@@ -41,183 +41,184 @@ Základní analogie: **Vesmír a Země.**
 │                    BRAIN                        │
 │                                                 │
 │  ┌─────────────────────────────────────────┐   │
-│  │            Hlavní smyčka                │   │
-│  │  vstup → LLM → function calling → výstup│   │
+│  │             Main loop                   │   │
+│  │  input → LLM → function calling → output│   │
 │  └─────────────────────────────────────────┘   │
 │                                                 │
 │  ┌─────────────────┐  ┌──────────────────────┐ │
-│  │ Standardní      │  │   self_improve()     │ │
-│  │ funkce (lokální)│  │  → přes Core         │ │
+│  │  Standard       │  │   self_improve()     │ │
+│  │  functions      │  │  → routed via Core   │ │
+│  │  (local)        │  │                      │ │
 │  └─────────────────┘  └──────────────────────┘ │
 │                                                 │
 │  /brain/                                        │
-│    brain.py         ← hlavní logika             │
-│    functions/       ← self-generované funkce    │
-│    assets/          ← libovolné zdroje          │
-│    backup/          ← zálohy předchozích verzí  │
+│    brain.py         ← main logic                │
+│    functions/       ← self-generated functions  │
+│    assets/          ← arbitrary resources       │
+│    backup/          ← snapshots of prior brain  │
 └─────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 3. Komponenty
+## 3. Components
 
 ### 3.1 Core
 
-Core je **BIOS systému** — neměnná vrstva, kterou brain nemůže za žádných okolností přepsat. Obsahuje několik modulů:
+Core is the **system BIOS** — an immutable layer that the brain cannot rewrite under any circumstance. It contains several modules:
 
 #### Chat Module
-Uživatel komunikuje výhradně přes Core. Zprávy se přidávají do kontextu a při každém volání se celý kontext předává Brainu jako vstup.
+The user communicates exclusively through Core. Messages are appended to the context, and on every call the full context is passed to the Brain as input.
 
 #### Scheduler
-Brain může přes Core registrovat časované úlohy. Core v daný čas nebo interval spustí Brain s předem definovaným vstupem a systémovou zprávou, která označuje, že jde o plánovanou úlohu (nikoli přímý uživatelský požadavek).
+Brain can register scheduled tasks via Core. At the configured time or interval, Core launches Brain with a predefined input and a system message marking it as a scheduled task (rather than a direct user request).
 
 ```
-Příklad systémové zprávy pro scheduled task:
-"[SCHEDULED TASK] Toto je automaticky spuštěná úloha: <popis úlohy>"
+Example system message for a scheduled task:
+"[SCHEDULED TASK] This is an automatically triggered task: <task description>"
 ```
 
 #### Process Manager
-Core spouští Brain v ochranném try-except bloku:
+Core runs Brain inside a protective try-except block:
 
-1. Brain se spustí.
-2. Pokud proběhne bez chyby → výstup se zpracuje normálně.
-3. Pokud Brain spadne (syntaktická chyba, výjimka, špatně vygenerovaný kód):
-   - Core provede **rollback** na poslední funkční zálohu z `brain/backup/`.
-   - Chyba (traceback, logy) se zapíše do kontextu jako systémová zpráva.
-   - Při příštím běhu LLM ví, co se pokazilo, a může to opravit.
+1. Brain runs.
+2. If it completes without error → output is processed normally.
+3. If Brain crashes (syntax error, exception, badly generated code):
+   - Core performs a **rollback** to the latest functional snapshot from `brain/backup/`.
+   - The error (traceback, logs) is written into the context as a system message.
+   - On the next run the LLM knows what broke and can fix it.
 
 #### Context Store
-Kontext je **permanentní a append-only** — historické kroky nelze přepsat (blockchain-like princip). Každá verze kontextu musí být konzistentní s předchozí. Kontext obsahuje:
-- historii konverzace s uživatelem,
-- systémové zprávy (errory, scheduled task notifikace),
-- výstupy z function callingu.
+The context is **permanent and append-only** — historical steps cannot be overwritten (blockchain-like principle). Each version of the context must be consistent with the previous one. The context contains:
+- conversation history with the user,
+- system messages (errors, scheduled task notifications),
+- function-calling outputs.
 
-> *Poznámka: Limit tokenů se bude řešit kompresí kontextu v pozdější fázi vývoje.*
+> *Note: token-limit handling will be addressed via context compression in a later phase.*
 
 #### Proxy
-Veškerá komunikace s DeepSeek API probíhá výhradně přes Proxy modul v Core. Brain nikdy nevidí API klíč — volá pouze `proxy.get(...)`, `proxy.post(...)` apod. Proxy přeloží volání na skutečný HTTP request.
+All communication with the LLM API goes exclusively through the Proxy module in Core. Brain never sees the API key — it only calls `proxy.get(...)`, `proxy.post(...)`, etc. Proxy translates the call into a real HTTP request.
 
 ---
 
 ### 3.2 Brain
 
-Brain je **živá část systému** — složka kódu, kterou lze za běhu přepisovat. Brain je napojen na LLM (DeepSeek) přes Proxy a řídí se vlastní logikou, kterou si sám navrhuje.
+Brain is the **living part of the system** — a code directory that can be rewritten at runtime. Brain is wired to the LLM through the Proxy and runs its own logic, which it designs itself.
 
-#### Hlavní smyčka
+#### Main loop
 
 ```
-vstup (z Core)
-  → zpracování v brain.py
-    → volání LLM (přes Proxy)
+input (from Core)
+  → processed in brain.py
+    → LLM call (via Proxy)
       → function calling
-        → výstup
-→ zpět do Core (uložení do kontextu, verifikace)
+        → output
+→ back to Core (stored in context, verified)
 ```
 
 #### Function Calling
 
-Brain může volat funkce dvěma způsoby:
+Brain can call functions in two ways:
 
-| Typ funkce | Kde se vykoná | Příklad |
+| Function type | Where it executes | Example |
 |---|---|---|
-| Standardní | Přímo v Brain | `get_weather()`, `search_web()` |
-| `self_improve()` | Přes Core | Přepis zdrojového kódu Brain |
+| Standard | Directly in Brain | `get_weather()`, `search_web()` |
+| `self_improve()` | Via Core | Rewrite Brain's own source |
 
-Standardní funkce si Brain generuje sám pomocí `self_improve()` a ukládá do `brain/functions/`.
+Standard functions are generated by Brain itself via `self_improve()` and stored in `brain/functions/`.
 
 #### self_improve()
 
-Klíčová funkce celého systému. Když LLM rozhodne, že chce novou schopnost nebo opravit chybu:
+The key function of the whole system. When the LLM decides it wants a new capability or to fix a bug:
 
-1. Zavolá `self_improve()` s popisem změny / novým kódem.
-2. Volání se **přesměruje do Core** (Brain ji nemůže vykonat sám).
-3. Core provede změnu v `brain/` složce.
-4. Před změnou uloží aktuální stav do `brain/backup/`.
-5. Pokud nová verze selže → automatický rollback (viz Process Manager).
+1. It calls `self_improve()` with a description / new code.
+2. The call is **routed to Core** (Brain cannot execute it itself).
+3. Core performs the change in `brain/`.
+4. Before the change, the current state is saved into `brain/backup/`.
+5. If the new version fails → automatic rollback (see Process Manager).
 
-Možné varianty `self_improve()`:
-- Vytvoření nové funkce
-- Úprava existující funkce
-- Přepis celého `brain.py`
+Possible variants of `self_improve()`:
+- Create a new function
+- Modify an existing function
+- Rewrite the whole `brain.py`
 
 ---
 
-## 4. Bezpečnostní model
+## 4. Security model
 
-| Pravidlo | Důvod |
+| Rule | Reason |
 |---|---|
-| Brain nemůže přepsat Core | Core je zákon — jeho porušení by bylo konec systému |
-| API klíče jsou pouze v Core (Proxy) | Brain nesmí mít přístup k přihlašovacím údajům |
-| `self_improve()` prochází Core | Core může v budoucnu přidat validaci, schválení, sandbox |
-| Kontext je append-only | Zabraňuje manipulaci s historií (podvody, reinterpretace) |
-| Backup před každou změnou | Garantuje funkční stav i po chybě |
+| Brain cannot rewrite Core | Core is the law — breaking it would end the system |
+| API keys live only in Core (Proxy) | Brain must not have access to credentials |
+| `self_improve()` goes through Core | Core can later add validation, approval, sandboxing |
+| Context is append-only | Prevents history manipulation (fraud, reinterpretation) |
+| Backup before every change | Guarantees a working state even after a failure |
 
-> *Rozšířená bezpečnostní vrstva (sandboxing, izolace procesů, whitelisting systémových volání) bude řešena v pozdější fázi.*
+> *Extended security (sandboxing, process isolation, syscall whitelisting) will be tackled in a later phase.*
 
 ---
 
-## 5. Technický stack
+## 5. Tech stack
 
-| Komponenta | Technologie |
+| Component | Technology |
 |---|---|
-| Jazyk | Python |
-| LLM | DeepSeek API |
-| Komunikace s LLM | Proxy modul (Core) |
-| Persistence kontextu | Soubor / databáze (TBD) |
-| Plánování úloh | Scheduler v Core |
+| Language | Python |
+| LLM | Multi-provider — Anthropic / OpenAI / Gemini / DeepSeek / local |
+| LLM communication | Proxy module (Core) |
+| Context persistence | File / database (TBD) |
+| Task scheduling | Scheduler in Core |
 
 ---
 
-## 6. Struktura projektu
+## 6. Project structure
 
 ```
-cell-2/
+cell/
 ├── core/
-│   ├── core.py              ← hlavní orchestrátor
-│   ├── chat.py              ← chat modul
-│   ├── scheduler.py         ← správa časovaných úloh
-│   ├── process_manager.py   ← spouštění brain, try-except, rollback
-│   ├── proxy.py             ← komunikace s DeepSeek API
-│   └── context_store.py     ← správa permanentního kontextu
+│   ├── core.py              ← main orchestrator
+│   ├── chat.py              ← chat module
+│   ├── scheduler.py         ← scheduled task registry
+│   ├── runner.py            ← spawns brain, try-except, rollback
+│   ├── proxy.py             ← LLM API communication
+│   └── context_store.py     ← permanent context store
 │
 ├── brain/
-│   ├── brain.py             ← hlavní logika agenta
-│   ├── functions/           ← self-generované funkce
-│   ├── assets/              ← libovolné zdroje
-│   └── backup/              ← zálohy předchozích verzí
+│   ├── brain.py             ← main agent logic
+│   ├── functions/           ← self-generated functions
+│   ├── assets/              ← arbitrary resources
+│   └── backup/              ← snapshots of prior versions
 │
 ├── WHITEPAPER.md
-└── CLAUDE.md
+└── README.md
 ```
 
 ---
 
-## 7. Životní cyklus jednoho běhu
+## 7. Lifecycle of one run
 
 ```
-1. Trigger (uživatel / scheduler / error recovery)
-2. Core sestaví vstup: kontext + systémové zprávy + nový vstup
-3. Process Manager spustí Brain (try-except)
-4. Brain zavolá LLM přes Proxy
-5. LLM rozhodne o akci:
-   a. Odpověď uživateli → výstup do Core
-   b. Volání standardní funkce → lokálně v Brain → výstup do Core
-   c. Volání self_improve() → Core provede změnu → Brain pokračuje
-6. Core verifikuje výstup, uloží do kontextu
-7. Výstup se zobrazí uživateli (nebo se uloží jako výsledek scheduled tasku)
+1. Trigger (user / scheduler / error recovery)
+2. Core assembles input: context + system messages + new input
+3. Process Manager runs Brain (try-except)
+4. Brain calls the LLM via Proxy
+5. The LLM decides on an action:
+   a. Reply to user → output to Core
+   b. Call a standard function → executed locally in Brain → output to Core
+   c. Call self_improve() → Core performs the change → Brain continues
+6. Core verifies the output, stores it in the context
+7. Output is shown to the user (or stored as a scheduled-task result)
 ```
 
 ---
 
-## 8. Budoucí rozvoj
+## 8. Future development
 
-- **Komprese kontextu** — automatické shrnutí starší historie pro řešení token limitu
-- **Rozšířená bezpečnostní vrstva** — sandbox pro brain, whitelist systémových volání
-- **Multi-brain** — více specializovaných Brain modulů koordinovaných Core
-- **Schvalovací mechanismus** — volitelné potvrzení uživatele před `self_improve()`
-- **Monitoring dashboard** — přehled stavu, verzí, scheduled tasků
+- **Context compression** — automatic summarization of older history to address token limits
+- **Extended security layer** — sandbox for the brain, syscall whitelist
+- **Multi-brain** — multiple specialized Brain modules coordinated by Core
+- **Approval mechanism** — optional user confirmation before `self_improve()`
+- **Monitoring dashboard** — overview of state, versions, scheduled tasks
 
 ---
 
-*Cell — systém, který roste.*
+*Cell — a system that grows.*
