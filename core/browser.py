@@ -1,4 +1,4 @@
-"""Cell-2 Browser — Lightweight web browsing for the agent.
+"""Cell Browser — Lightweight web browsing for the agent.
 
 Uses requests + BeautifulSoup for simple sites.
 For JS-heavy sites, falls back to playwright (if installed).

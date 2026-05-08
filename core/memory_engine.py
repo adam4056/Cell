@@ -1,4 +1,4 @@
-"""Cell-2 Memory Engine — PersonaVLM four-layer cognitive memory.
+"""Cell Memory Engine — PersonaVLM four-layer cognitive memory.
 
 Layers:
   Core       — fundamental user attributes (name, identity)        (CRUD, single profile.md)

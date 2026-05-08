@@ -1,4 +1,4 @@
-# Cell-2 Docker Image
+# Cell Docker Image
 # Usage:
 #   docker build -t cell2 .
 #   docker run -it --rm -v cell2-data:/app/data cell2

@@ -1,4 +1,4 @@
-"""Cell-2 web entry point — `python cell2_web.py` opens the dashboard."""
+"""Cell web entry point — `python cell2_web.py` opens the dashboard."""
 
 import sys
 import threading
@@ -22,5 +22,5 @@ def _open_browser():
 if __name__ == "__main__":
     if "--no-browser" not in sys.argv:
         threading.Thread(target=_open_browser, daemon=True).start()
-    print(f"Cell-2 web — http://{HOST}:{PORT}")
+    print(f"Cell web — http://{HOST}:{PORT}")
     serve(host=HOST, port=PORT)

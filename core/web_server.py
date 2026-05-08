@@ -1,4 +1,4 @@
-"""Cell-2 web server — FastAPI + WebSocket.
+"""Cell web server — FastAPI + WebSocket.
 
 Two modes:
   - Space: persistent infinite context (context.json + full memory curation)
@@ -32,7 +32,7 @@ from core.memory_engine import engine as memory_engine
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 STATIC_DIR = os.path.join(ROOT, "web", "static")
 
-app = FastAPI(title="Cell-2")
+app = FastAPI(title="Cell")
 
 
 @app.middleware("http")

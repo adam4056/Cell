@@ -1,8 +1,8 @@
-# Cell-2
+# Cell
 
 > A self-improving personal AI agent that runs on **your** machine. One agent — code, browse, remember, schedule, talk back. No walled garden.
 
-Cell-2 starts with a single tool (`self_improve`) and writes the rest at runtime as it needs them. Generated tools persist in `brain/functions/` and are reused on the next turn. It remembers you across sessions in a four-layer cognitive memory (not a chat dump). It can think proactively in the background. It runs locally.
+Cell starts with a single tool (`self_improve`) and writes the rest at runtime as it needs them. Generated tools persist in `brain/functions/` and are reused on the next turn. It remembers you across sessions in a four-layer cognitive memory (not a chat dump). It can think proactively in the background. It runs locally.
 
 **Status:** v0.5 — multi-provider (Anthropic / OpenAI / Gemini / DeepSeek / Ollama), native vision, MCP client, web UI, ambient agent, four-layer memory.
 
@@ -29,7 +29,7 @@ That's it. On first run, `brain/brain.py` is auto-bootstrapped from `brain/brain
 
 ---
 
-## What makes Cell-2 different
+## What makes Cell different
 
 - **Self-improving.** The agent writes its own tools. Need a stock price checker? It'll write one — and reuse it next time.
 - **Real memory.** Four cognitive layers (Core / Semantic / Episodic / Procedural), Big Five personality with momentum, embedding retrieval. RAG-but-it-can-actually-update.

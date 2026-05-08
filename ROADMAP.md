@@ -1,6 +1,6 @@
-# Cell-2 Roadmap
+# Cell Roadmap
 
-Cell-2 is not a chatbot. It is your **personal AI agent** — the only AI tool you will ever need. One agent that actually does things: manages your life, writes code, controls your computer, browses the web, and remembers everything.
+Cell is not a chatbot. It is your **personal AI agent** — the only AI tool you will ever need. One agent that actually does things: manages your life, writes code, controls your computer, browses the web, and remembers everything.
 
 ---
 
@@ -145,7 +145,7 @@ Cíl: **Cell přestává být reaktivní.** Sám si všimne, sám se ozve, sám 
 
 ## Phase 2: Hermes Parity & Beyond (v0.4.1 — v0.8)
 
-**Strategická pozice:** Hermes Agent (Nous Research) a OpenClaw jsou dnešní laťka pro autonomní AI agenty. Cílem fáze 2 je se s Hermesem nejdřív vyrovnat (v0.5–v0.7) a pak ho předehnat (v0.8) skrze to, co Cell-2 dělá unikátně: čtyřvrstvá paměť, Big Five momentum, Core/Brain isolation s `self_improve`. Před tím malý refaktor (v0.4.1), aby proaktivita byla **opravdu** proaktivní.
+**Strategická pozice:** Hermes Agent (Nous Research) a OpenClaw jsou dnešní laťka pro autonomní AI agenty. Cílem fáze 2 je se s Hermesem nejdřív vyrovnat (v0.5–v0.7) a pak ho předehnat (v0.8) skrze to, co Cell dělá unikátně: čtyřvrstvá paměť, Big Five momentum, Core/Brain isolation s `self_improve`. Před tím malý refaktor (v0.4.1), aby proaktivita byla **opravdu** proaktivní.
 
 ### v0.4.1 — "Proactivity" (sjednocení ambient, uvolnění promptu) ✓ shipped
 
@@ -177,7 +177,7 @@ V kódu jsou heartbeat a ambient **už dnes jedna smyčka** (`_run_ambient_tick`
 
 ### Co dnes chybí oproti Hermes (audit ke 2026-05)
 
-| Oblast | Hermes | Cell-2 dnes |
+| Oblast | Hermes | Cell dnes |
 |---|---|---|
 | Multi-model | ano (model-agnostic) | DeepSeek / OpenAI / Anthropic / Gemini / Ollama |
 | Vision | nativní | nativní multimodal API |
@@ -265,11 +265,11 @@ Cíl: paralelní výpočet + dosažitelnost odkudkoli + sdílení skillů.
     - Tier 2 (trusted): manuálně schválené uživatelem, plné permissions per manifest scope
     - Provenance: hash + zdroj URL + datum instalace v `~/.cell-2/skills.json`
 
-→ *Cell-2 == Hermes feature parity.*
+→ *Cell == Hermes feature parity.*
 
 ### v0.8 — "Beyond Hermes" (diferenciace)
 
-Cíl: využít unikátních silných stránek Cell-2 a předehnat Hermes ve čtyřech osách: paměť, bezpečnost self-improvementu, predikce, lokální AI.
+Cíl: využít unikátních silných stránek Cell a předehnat Hermes ve čtyřech osách: paměť, bezpečnost self-improvementu, predikce, lokální AI.
 
 - [ ] **Self-improving brain v2** — `self_improve` jako produkční pipeline, ne hraní
   - **LLM-as-reviewer** — nezávislá instance čte každou navrženou změnu (security, bugs, regrese)
@@ -307,7 +307,7 @@ Cíl: využít unikátních silných stránek Cell-2 a předehnat Hermes ve čty
   - Telefon ↔ laptop ↔ server: stejná persona, stejná paměť
   - Konflikt resolution: "newest semantic, append-merge episodic"
 
-→ *Cell-2 už není kopie Hermes — má hlubší paměť, sleep cycle, bezpečný self-improvement s testy a red-teamem, ambient OS signály a lokální fine-tuning.*
+→ *Cell už není kopie Hermes — má hlubší paměť, sleep cycle, bezpečný self-improvement s testy a red-teamem, ambient OS signály a lokální fine-tuning.*
 
 ---
 
@@ -316,7 +316,7 @@ Cíl: využít unikátních silných stránek Cell-2 a předehnat Hermes ve čty
 Cíl: produkt ready pro široké použití.
 
 ### v1.0 — "The Workstation"
-- [ ] **Docker support** — celý Cell-2 jako Docker container
+- [ ] **Docker support** — celý Cell jako Docker container
   - `docker run -it cell2` — okamžitý start
   - Persistentní volume pro `memory/`, `context.json`, `chats/`, config
   - Ideální pro 24/7 serverové nasazení; docker-compose s Redis/Postgres

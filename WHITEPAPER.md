@@ -1,4 +1,4 @@
-# Cell-2 — Whitepaper
+# Cell — Whitepaper
 
 > *"Vesmír je zákon. Země je život."*
 
@@ -6,7 +6,7 @@
 
 ## 1. Vize
 
-Cell-2 je self-improving AI agent — systém schopný autonomního fungování, rozšiřování vlastních schopností a dlouhodobé paměti. Na rozdíl od statických agentů (jako Hermes Agent nebo OpenClaw) si Cell-2 může přepisovat vlastní zdrojový kód, vytvářet nové funkce a plánovat vlastní úlohy — vše v rámci pevně daných hranic, které zajišťuje neměnné jádro systému.
+Cell je self-improving AI agent — systém schopný autonomního fungování, rozšiřování vlastních schopností a dlouhodobé paměti. Na rozdíl od statických agentů (jako Hermes Agent nebo OpenClaw) si Cell může přepisovat vlastní zdrojový kód, vytvářet nové funkce a plánovat vlastní úlohy — vše v rámci pevně daných hranic, které zajišťuje neměnné jádro systému.
 
 Základní analogie: **Vesmír a Země.**
 
@@ -220,4 +220,4 @@ cell-2/
 
 ---
 
-*Cell-2 — systém, který roste.*
+*Cell — systém, který roste.*

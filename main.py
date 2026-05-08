@@ -1,4 +1,4 @@
-"""Cell-2 entrypoint — Textual TUI."""
+"""Cell entrypoint — Textual TUI."""
 
 from tui.app import run
 

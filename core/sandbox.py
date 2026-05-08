@@ -1,4 +1,4 @@
-"""Cell-2 Code Sandbox — Safe execution of user/agent code.
+"""Cell Code Sandbox — Safe execution of user/agent code.
 
 Creates isolated venv, runs code, captures output, cleans up.
 Used by brain functions to test code before deployment.

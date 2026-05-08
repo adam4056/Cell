@@ -1,4 +1,4 @@
-"""Cell-2 CLI — Traditional terminal interface using blessed.
+"""Cell CLI — Traditional terminal interface using blessed.
 
 Pure text, no GUI widgets. Like irssi or weechat.
 """
@@ -54,11 +54,11 @@ class CellCLI:
             # Welcome
             if settings.is_first_run():
                 self._add_system(
-                    "Cell-2 — your personal AI agent. Type /help for commands."
+                    "Cell — your personal AI agent. Type /help for commands."
                 )
                 settings.complete_onboarding()
             else:
-                self._add_system("Cell-2 ready.")
+                self._add_system("Cell ready.")
 
             self._draw()
 

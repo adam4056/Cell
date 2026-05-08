@@ -48,7 +48,7 @@ def _handle_message(token: str, message: dict) -> None:
             token,
             chat_id,
             f"Your Telegram user_id is: {user_id}\n"
-            f"Add it to config.yaml as `telegram_user_id: {user_id}` to start chatting with Cell-2.",
+            f"Add it to config.yaml as `telegram_user_id: {user_id}` to start chatting with Cell.",
         )
         return
 

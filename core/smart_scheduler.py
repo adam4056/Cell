@@ -1,4 +1,4 @@
-"""Cell-2 Smart Scheduler — Natural language task scheduling.
+"""Cell Smart Scheduler — Natural language task scheduling.
 
 Extends core scheduler with LLM-based natural language parsing.
 User can say: "every morning at 8am" instead of cron syntax.
