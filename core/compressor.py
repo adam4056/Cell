@@ -66,15 +66,18 @@ def maybe_compress() -> bool:
 
         messages = [
             {"role": "system", "content": _SUMMARIZE_PROMPT},
-            {"role": "user", "content": (
-                f"Previous summary (may be empty):\n{previous or '(none)'}\n\n"
-                f"New messages to fold in:\n{_format_for_llm(to_compress)}\n\n"
-                f"Output the updated summary only."
-            )},
+            {
+                "role": "user",
+                "content": (
+                    f"Previous summary (may be empty):\n{previous or '(none)'}\n\n"
+                    f"New messages to fold in:\n{_format_for_llm(to_compress)}\n\n"
+                    f"Output the updated summary only."
+                ),
+            },
         ]
 
         try:
-            new_summary = proxy.chat(messages).get("content", "").strip()
+            new_summary = proxy.chat(messages, cheap=True).get("content", "").strip()
         except Exception:
             return False
 

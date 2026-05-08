@@ -1,14 +1,68 @@
-# OpenAI-compatible chat backend (Ollama, DeepSeek, OpenAI, …)
-api_base: "http://127.0.0.1:11435/v1"   # Ollama default port: 11434
-api_key: "ollama"                        # any non-empty value for Ollama
-model: "gemma4:e4b"
+# ── Multi-provider setup ──────────────────────────────────────
+# default_provider is the key from the providers map below.
+# If absent, the first provider key is used.
+default_provider: "deepseek"
 
-# Legacy keys (still respected if api_base unset):
+providers:
+  deepseek:
+    type: "openai_compat"
+    api_base: "https://api.deepseek.com"
+    api_key: "sk-..."
+    model: "deepseek-chat"
+    cheap_model: "deepseek-chat"
+
+  # openai:
+  #   type: "openai_compat"
+  #   api_base: "https://api.openai.com/v1"
+  #   api_key: "sk-..."
+  #   model: "gpt-4.1"
+  #   cheap_model: "gpt-4.1-mini"
+
+  # anthropic:
+  #   type: "anthropic"
+  #   api_key: "sk-ant-..."
+  #   model: "claude-sonnet-4-20250514"
+  #   cheap_model: "claude-haiku-3-5-20241022"
+
+  # gemini:
+  #   type: "gemini"
+  #   api_key: "..."
+  #   model: "gemini-2.5-pro"
+  #   cheap_model: "gemini-2.5-flash"
+
+  # local:
+  #   type: "openai_compat"
+  #   api_base: "http://127.0.0.1:11434/v1"
+  #   api_key: "ollama"
+  #   model: "llama3"
+  #   cheap_model: "llama3"
+
+# ── Legacy flat config (still works if no providers map) ─────
+# api_base: "https://api.deepseek.com"
+# api_key: "sk-..."
+# model: "deepseek-chat"
 # deepseek_api_key: "sk-..."
 
-# Brave Search API key (https://brave.com/search/api/)
+# ── Brave Search API key (https://brave.com/search/api/) ──────
 brave_search_api_key: ""
 
+# ── Web UI authentication ─────────────────────────────────────
+web_auth_token: ""
+
+# ── Ambient agent ─────────────────────────────────────────────
 ambient_interval_seconds: 0
+
+# ── MCP servers ──────────────────────────────────────────────
+# mcp_servers:
+#   filesystem:
+#     command: "npx"
+#     args: ["-y", "@modelcontextprotocol/server-filesystem", "/path/to/allowed"]
+#   github:
+#     command: "npx"
+#     args: ["-y", "@modelcontextprotocol/server-github"]
+#     env:
+#       GITHUB_PERSONAL_ACCESS_TOKEN: "ghp_..."
+
+# ── Telegram bot ──────────────────────────────────────────────
 telegram_bot_token: ""
 telegram_user_id: null

@@ -10,6 +10,18 @@ import subprocess
 
 from core import inbox, memory_store, permissions, proxy, scheduler
 
+try:
+    from core import mcp_client
+
+    def _mcp_call_tool(p: dict):
+        return mcp_client.call_tool(
+            p["server_name"], p["tool_name"], p.get("arguments", {})
+        )
+except ImportError:
+
+    def _mcp_call_tool(p: dict):
+        return "MCP client not available"
+
 
 def _llm_chat(p: dict):
     kwargs = {"messages": p["messages"]}
@@ -67,7 +79,9 @@ def _gate(operation: str, detail: str) -> None:
         return
     if decision == "deny":
         raise PermissionError(f"user denied {operation}: {detail}")
-    raise PermissionError(f"user did not respond to {operation} prompt within timeout: {detail}")
+    raise PermissionError(
+        f"user did not respond to {operation} prompt within timeout: {detail}"
+    )
 
 
 def _host_read_file(p: dict):
@@ -88,7 +102,10 @@ def _host_write_file(p: dict):
 def _host_run_command(p: dict):
     cmd = p["cmd"]
     _gate("host.run_command", cmd)
-    result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=120)
+    import shlex
+
+    cmd_parts = shlex.split(cmd) if isinstance(cmd, str) else cmd
+    result = subprocess.run(cmd_parts, capture_output=True, text=True, timeout=120)
     return {
         "exit": result.returncode,
         "stdout": result.stdout,
@@ -101,11 +118,13 @@ def build_dispatch(self_improve_handler) -> dict:
     because it carries the per-turn context_store side effect."""
 
     def _self_improve(p: dict):
-        return self_improve_handler({
-            "filename": p["filename"],
-            "code": p["code"],
-            "description": p["description"],
-        })
+        return self_improve_handler(
+            {
+                "filename": p["filename"],
+                "code": p["code"],
+                "description": p["description"],
+            }
+        )
 
     return {
         "llm.chat": _llm_chat,
@@ -121,4 +140,5 @@ def build_dispatch(self_improve_handler) -> dict:
         "host.read_file": _host_read_file,
         "host.write_file": _host_write_file,
         "host.run_command": _host_run_command,
+        "mcp.call_tool": _mcp_call_tool,
     }

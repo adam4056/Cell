@@ -6,9 +6,11 @@ schedule.json
 summary.json
 settings.json
 memory/
+chats/
 *.tmp
+*.log
 
-# Config (contains API key)
+# Config (contains API keys — use config.yaml.example as template)
 config.yaml
 
 # Archives / old versions
@@ -42,6 +44,14 @@ build/
 .venv/
 venv/
 env/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# OS junk
+.DS_Store
+Thumbs.db
+nul
 
 # Personal
 ASSISTANT.md

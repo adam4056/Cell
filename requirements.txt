@@ -4,6 +4,10 @@ rich>=13.7
 blessed>=1.39
 beautifulsoup4>=4.12
 
+# Web UI
+fastapi>=0.110
+uvicorn[standard]>=0.29
+
 # Memory retrieval. sentence-transformers is optional (~470 MB model on first
 # use) — without it, retrieval falls back to keyword matching with crude stem
 # trimming. Install for proper PersonaVLM-style semantic recall.

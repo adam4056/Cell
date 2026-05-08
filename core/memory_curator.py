@@ -103,6 +103,7 @@ Rules:
 # JSON parsing
 # ---------------------------------------------------------------------------
 
+
 def _extract_json(text: str) -> dict | None:
     if not text:
         return None
@@ -121,7 +122,11 @@ def _extract_json(text: str) -> dict | None:
 def _llm_json(prompt: str, system: str) -> dict | None:
     try:
         response = proxy.request(
-            [{"role": "system", "content": system}, {"role": "user", "content": prompt}],
+            [
+                {"role": "system", "content": system},
+                {"role": "user", "content": prompt},
+            ],
+            cheap=True,
             model=None,
         )
     except Exception:
@@ -136,6 +141,7 @@ def _llm_json(prompt: str, system: str) -> dict | None:
 # ---------------------------------------------------------------------------
 # Per-turn curation
 # ---------------------------------------------------------------------------
+
 
 class MemoryCurator:
     def __init__(self, mem: MemoryEngine | None = None) -> None:
@@ -152,7 +158,9 @@ class MemoryCurator:
             user_msg=user_msg.strip()[:4000],
             assistant_msg=(assistant_msg or "").strip()[:2000],
         )
-        data = _llm_json(prompt, "You are a memory extraction engine. Output ONLY valid JSON.")
+        data = _llm_json(
+            prompt, "You are a memory extraction engine. Output ONLY valid JSON."
+        )
         if data is None:
             return {"skipped": "llm_no_json"}
 
@@ -172,17 +180,23 @@ class MemoryCurator:
                 session_id=sid,
             )
             report["semantic"].append(f"{key}: {content[:60]}")
-            _log(f"semantic upsert key={key} importance={importance} content={content[:80]}")
+            _log(
+                f"semantic upsert key={key} importance={importance} content={content[:80]}"
+            )
 
         observed = data.get("personality_observed") or {}
         new_state = memory_personality.update(observed)
         if new_state is not None:
             report["personality_updated"] = True
-            _log(f"personality updated turn={memory_personality.get_turn()} state={new_state}")
+            _log(
+                f"personality updated turn={memory_personality.get_turn()} state={new_state}"
+            )
 
         return report
 
-    def curate_session(self, session: dict[str, Any], messages: list[dict[str, Any]]) -> dict[str, Any]:
+    def curate_session(
+        self, session: dict[str, Any], messages: list[dict[str, Any]]
+    ) -> dict[str, Any]:
         sid = int(session.get("id", 0))
         if not messages:
             _log(f"session #{sid} closed but had no messages — skipping")
@@ -190,7 +204,9 @@ class MemoryCurator:
 
         dialogue = self._format_dialogue(messages)
         prompt = _SESSION_PROMPT.format(dialogue=dialogue[:12000])
-        data = _llm_json(prompt, "You are a memory extraction engine. Output ONLY valid JSON.")
+        data = _llm_json(
+            prompt, "You are a memory extraction engine. Output ONLY valid JSON."
+        )
         if data is None:
             return {"skipped": "llm_no_json"}
 
@@ -200,7 +216,9 @@ class MemoryCurator:
             summary = str(ev.get("summary", "")).strip()
             if not summary:
                 continue
-            keywords = [str(k).strip() for k in (ev.get("keywords") or []) if str(k).strip()]
+            keywords = [
+                str(k).strip() for k in (ev.get("keywords") or []) if str(k).strip()
+            ]
             self.mem.create(
                 "episodic",
                 summary,
@@ -220,11 +238,14 @@ class MemoryCurator:
                 if content in existing.content:
                     continue
                 self.mem.update(
-                    "core", "profile.md",
+                    "core",
+                    "profile.md",
                     content=(existing.content + "\n" + content).strip(),
                 )
             else:
-                self.mem.create("core", content, importance=float(cu.get("importance", 8.0)))
+                self.mem.create(
+                    "core", content, importance=float(cu.get("importance", 8.0))
+                )
             report["core"].append(content[:60])
 
         for pu in data.get("procedural_updates") or []:
@@ -234,7 +255,9 @@ class MemoryCurator:
             key = str(pu.get("key", "")).strip()
             importance = float(pu.get("importance", 5.0))
             if key:
-                slug = re.sub(r"[^\w\-]+", "_", key.lower(), flags=re.UNICODE).strip("_")[:50]
+                slug = re.sub(r"[^\w\-]+", "_", key.lower(), flags=re.UNICODE).strip(
+                    "_"
+                )[:50]
                 existing = self.mem.read("procedural", f"{slug}.md")
                 if existing:
                     existing.content = content
@@ -248,12 +271,19 @@ class MemoryCurator:
                     self.mem._index_entry(existing)  # noqa: SLF001
                 else:
                     self.mem.create(
-                        "procedural", content, key=key, importance=importance,
-                        tags=["auto"], session_id=sid,
+                        "procedural",
+                        content,
+                        key=key,
+                        importance=importance,
+                        tags=["auto"],
+                        session_id=sid,
                     )
             else:
                 self.mem.create(
-                    "procedural", content, importance=importance, tags=["auto"],
+                    "procedural",
+                    content,
+                    importance=importance,
+                    tags=["auto"],
                     session_id=sid,
                 )
             report["procedural"].append(content[:60])
@@ -282,7 +312,8 @@ class MemoryCurator:
             content = m.get("content", "")
             if isinstance(content, list):
                 content = " ".join(
-                    str(p.get("text", p)) if isinstance(p, dict) else str(p) for p in content
+                    str(p.get("text", p)) if isinstance(p, dict) else str(p)
+                    for p in content
                 )
             if role in ("user", "assistant"):
                 lines.append(f"{role.capitalize()}: {content}")
@@ -305,6 +336,7 @@ def curator() -> MemoryCurator:
 # Background entry points
 # ---------------------------------------------------------------------------
 
+
 def start_turn_curation(user_msg: str, assistant_msg: str) -> None:
     """Background per-turn curation. Non-blocking; errors are logged."""
 
@@ -317,7 +349,9 @@ def start_turn_curation(user_msg: str, assistant_msg: str) -> None:
     threading.Thread(target=_run, daemon=True).start()
 
 
-def start_session_curation(session: dict[str, Any], messages: list[dict[str, Any]]) -> None:
+def start_session_curation(
+    session: dict[str, Any], messages: list[dict[str, Any]]
+) -> None:
     """Background per-session curation triggered when a session closes."""
 
     def _run() -> None:

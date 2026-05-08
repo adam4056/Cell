@@ -1,0 +1,1044 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Cell</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/styles/github.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/highlight.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --cream: #FFFBF5;
+      --ink: #1a1a1a;
+      --ink-soft: #2a2a2a;
+      --muted: #8a8478;
+    }
+    html, body { height: 100%; }
+    body {
+      background: var(--cream);
+      color: var(--ink);
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    .pill {
+      background: var(--ink);
+      color: #fff;
+      border-radius: 9999px;
+      padding: 10px 24px;
+      font-size: 14px;
+      font-weight: 500;
+      transition: transform .15s ease, opacity .2s ease, background .2s ease, color .2s ease;
+      cursor: pointer;
+      user-select: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      border: 0;
+    }
+    .pill:hover { transform: translateY(-1px); background: var(--ink); color: #fff; opacity: 1; }
+    .pill:active { transform: translateY(0) scale(.97); }
+    .pill.inactive { background: transparent; color: var(--ink); opacity: .55; }
+    .pill.ghost {
+      background: rgba(255,255,255,.65);
+      backdrop-filter: blur(8px);
+      color: var(--ink);
+      box-shadow: 0 1px 0 rgba(0,0,0,.04);
+    }
+    .pill.ghost:hover { background: var(--ink); color: #fff; }
+    .icon-btn {
+      width: 34px; height: 34px;
+      border-radius: 10px;
+      display: grid;
+      place-items: center;
+      cursor: pointer;
+      transition: background .15s ease, color .15s ease;
+      background: transparent;
+      color: var(--muted);
+      border: 0;
+    }
+    .icon-btn:hover { background: rgba(0,0,0,.05); color: var(--ink); }
+    .menu-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 12px 7px 10px;
+      border-radius: 9999px;
+      background: transparent;
+      color: var(--muted);
+      border: 0;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 500;
+      transition: background .15s, color .15s;
+    }
+    .menu-btn:hover { background: rgba(0,0,0,.05); color: var(--ink); }
+    .msg-user {
+      background: var(--ink);
+      color: #fff;
+      border-radius: 9999px;
+      padding: 14px 22px;
+      max-width: 70%;
+      font-size: 15px;
+      line-height: 1.4;
+      align-self: flex-end;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .msg-assistant {
+      color: var(--ink);
+      font-size: 15.5px;
+      line-height: 1.6;
+      max-width: 760px;
+      position: relative;
+      padding-right: 36px;
+    }
+    .msg-assistant .copy-btn {
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: 28px; height: 28px;
+      border-radius: 8px;
+      border: 0;
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      opacity: 0;
+      transition: opacity .15s, background .15s, color .15s;
+      display: grid;
+      place-items: center;
+    }
+    .msg-assistant:hover .copy-btn { opacity: .65; }
+    .msg-assistant .copy-btn:hover { opacity: 1; background: rgba(0,0,0,.06); color: var(--ink); }
+    .msg-assistant .copy-btn.copied { color: var(--ink); opacity: 1; }
+    /* System events as compact graphical chips */
+    .msg-system {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 4px 12px 4px 4px;
+      border-radius: 9999px;
+      background: rgba(0,0,0,.035);
+      max-width: 100%;
+      white-space: nowrap;
+      overflow: hidden;
+      line-height: 1;
+      width: fit-content;
+    }
+    .sys-icon {
+      width: 18px; height: 18px;
+      border-radius: 50%;
+      display: inline-grid;
+      place-items: center;
+      flex-shrink: 0;
+      background: rgba(0,0,0,.08);
+      color: var(--muted);
+    }
+    .sys-icon svg { display: block; }
+    .sys-icon.sys-create { background: #def5e0; color: #2d7c34; }
+    .sys-icon.sys-update { background: #fff1d4; color: #b06f0e; }
+    .sys-icon.sys-error  { background: #fde2e2; color: #c33; }
+    .sys-icon.sys-ambient{ background: #efe4fb; color: #6c4abf; }
+    .sys-icon.sys-inbox  { background: #def5e0; color: #2d7c34; }
+    .sys-icon.sys-cancel { background: rgba(0,0,0,.08); color: var(--muted); }
+    .sys-label {
+      font-size: 11.5px;
+      color: var(--ink-soft);
+      line-height: 1.3;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .sys-label {
+      font-size: 11.5px;
+      color: var(--ink-soft);
+      line-height: 1.3;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    /* Tighten spacing between stacked system chips */
+    .max-w-3xl > .fade-up:has(.msg-system) + .fade-up:has(.msg-system) {
+      margin-top: -16px;
+    }
+    .input-bar {
+      background: var(--ink);
+      color: #fff;
+      border-radius: 9999px;
+      padding: 6px 18px 6px 22px;
+      display: flex;
+      align-items: flex-end;
+      gap: 10px;
+      width: min(720px, 88vw);
+      box-shadow: 0 8px 24px rgba(0,0,0,.10);
+    }
+    .input-bar textarea {
+      flex: 1;
+      background: transparent;
+      border: 0;
+      outline: 0;
+      color: #fff;
+      font-size: 15px;
+      font-family: inherit;
+      padding: 10px 0;
+      resize: none;
+      line-height: 1.4;
+      max-height: 200px;
+      overflow-y: auto;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(255,255,255,.2) transparent;
+    }
+    .input-bar textarea::placeholder { color: rgba(255,255,255,.55); }
+    .input-bar textarea::-webkit-scrollbar { width: 4px; }
+    .input-bar textarea::-webkit-scrollbar-thumb { background: rgba(255,255,255,.2); border-radius: 2px; }
+    .send-btn {
+      background: transparent;
+      color: #fff;
+      width: 32px; height: 32px;
+      min-width: 32px;
+      border-radius: 9999px;
+      display: grid;
+      place-items: center;
+      cursor: pointer;
+      transition: transform .15s ease, opacity .2s ease;
+      border: 0;
+      align-self: flex-end;
+      margin-bottom: 6px;
+      opacity: .9;
+    }
+    .send-btn:hover { transform: scale(1.1); opacity: 1; }
+    .send-btn:active { transform: scale(.92); }
+    .send-btn:disabled { opacity: .35; cursor: not-allowed; transform: none; }
+    .send-btn.stop { color: #fff; }
+    .send-btn.stop:hover { opacity: 1; }
+    .chat-pill-new {
+      border: 1.5px dashed var(--ink);
+      color: var(--ink);
+      border-radius: 9999px;
+      padding: 18px 48px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all .15s ease;
+      width: 100%;
+      max-width: 560px;
+      text-align: center;
+      background: transparent;
+      letter-spacing: .01em;
+    }
+    .chat-pill-new:hover { background: var(--ink); color: var(--cream); transform: translateY(-1px); border-style: solid; }
+    .chats-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4px 24px;
+      width: 100%;
+      max-width: 720px;
+      margin-top: 28px;
+    }
+    @media (max-width: 640px) {
+      .chats-grid { grid-template-columns: 1fr; }
+    }
+    .chat-pill {
+      color: var(--ink);
+      border-radius: 9999px;
+      padding: 14px 28px;
+      font-size: 15px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all .15s ease;
+      text-align: left;
+      background: transparent;
+      border: 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .chat-pill .chat-title {
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .chat-pill .chat-meta {
+      font-size: 11px;
+      color: var(--muted);
+      font-weight: 400;
+      white-space: nowrap;
+    }
+    .chat-pill .chat-del {
+      opacity: 0;
+      font-size: 16px;
+      line-height: 1;
+      transition: opacity .15s, background .15s;
+      padding: 2px 8px;
+      border-radius: 8px;
+    }
+    .chat-pill:hover { background: var(--ink); color: #fff; }
+    .chat-pill:hover .chat-meta { color: rgba(255,255,255,.55); }
+    .chat-pill:hover .chat-del { opacity: .65; }
+    .chat-pill .chat-del:hover { opacity: 1; background: rgba(255,255,255,.18); }
+    .hero {
+      text-align: center;
+      color: var(--muted);
+      font-size: 28px;
+      font-weight: 500;
+      letter-spacing: -.01em;
+      margin-top: 18vh;
+      animation: fadeUp .5s ease both;
+    }
+    .hero .accent { color: var(--ink); }
+    .msg-assistant h1, .msg-assistant h2, .msg-assistant h3 { margin: 1em 0 .5em; font-weight: 600; }
+    .msg-assistant h1 { font-size: 1.25em; }
+    .msg-assistant h2 { font-size: 1.15em; }
+    .msg-assistant h3 { font-size: 1.05em; }
+    .msg-assistant p { margin: .4em 0; }
+    .msg-assistant ul, .msg-assistant ol { margin: .4em 0; padding-left: 1.4em; }
+    .msg-assistant li { margin: .2em 0; }
+    .msg-assistant strong { font-weight: 600; }
+    .msg-assistant code {
+      background: rgba(0,0,0,.06);
+      padding: .1em .35em;
+      border-radius: 4px;
+      font-size: .9em;
+      font-family: 'SF Mono', Monaco, Menlo, Consolas, monospace;
+    }
+    .msg-assistant a { color: var(--ink); text-decoration: underline; }
+    .msg-assistant blockquote { border-left: 2px solid rgba(0,0,0,.15); margin: .5em 0; padding-left: .8em; color: var(--muted); }
+
+    /* Tables (GFM) */
+    .msg-assistant table {
+      border-collapse: separate;
+      border-spacing: 0;
+      margin: .9em 0;
+      font-size: .92em;
+      border: 1px solid rgba(0,0,0,.08);
+      border-radius: 12px;
+      overflow: hidden;
+      background: rgba(255,255,255,.4);
+      width: auto;
+      max-width: 100%;
+    }
+    .msg-assistant th, .msg-assistant td {
+      padding: 9px 16px;
+      text-align: left;
+      border-right: 1px solid rgba(0,0,0,.06);
+      border-bottom: 1px solid rgba(0,0,0,.06);
+      vertical-align: top;
+    }
+    .msg-assistant th:last-child, .msg-assistant td:last-child { border-right: 0; }
+    .msg-assistant tbody tr:last-child td { border-bottom: 0; }
+    .msg-assistant thead { background: rgba(0,0,0,.04); }
+    .msg-assistant th {
+      font-weight: 600;
+      font-size: .85em;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      color: var(--ink);
+    }
+    .msg-assistant tbody tr { transition: background .15s; }
+    .msg-assistant tbody tr:hover { background: rgba(0,0,0,.02); }
+
+    /* Code viewer (wrapped pre) */
+    .msg-assistant .code-block {
+      margin: .9em 0;
+      border-radius: 12px;
+      overflow: hidden;
+      background: #fbf6ec;
+      border: 1px solid rgba(0,0,0,.08);
+      box-shadow: 0 1px 0 rgba(0,0,0,.02);
+    }
+    .msg-assistant .code-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 7px 12px 7px 16px;
+      background: rgba(0,0,0,.04);
+      border-bottom: 1px solid rgba(0,0,0,.05);
+    }
+    .msg-assistant .code-bar .code-lang {
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      font-weight: 600;
+      font-size: 10.5px;
+      font-family: 'SF Mono', Monaco, Menlo, Consolas, monospace;
+    }
+    .msg-assistant .code-bar .pre-copy {
+      background: transparent;
+      border: 0;
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-family: inherit;
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--muted);
+      cursor: pointer;
+      transition: all .15s;
+      opacity: .75;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .msg-assistant .code-bar .pre-copy:hover { background: var(--ink); color: #fff; opacity: 1; }
+    .msg-assistant .code-bar .pre-copy.copied { color: #2d7c34; opacity: 1; }
+    .msg-assistant .code-block pre {
+      margin: 0;
+      padding: 14px 16px;
+      background: transparent;
+      overflow-x: auto;
+      font-size: 13px;
+      line-height: 1.55;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(0,0,0,.15) transparent;
+    }
+    .msg-assistant .code-block pre::-webkit-scrollbar { height: 6px; }
+    .msg-assistant .code-block pre::-webkit-scrollbar-thumb { background: rgba(0,0,0,.15); border-radius: 3px; }
+    .msg-assistant .code-block pre code {
+      background: none;
+      padding: 0;
+      font-family: 'SF Mono', Monaco, Menlo, Consolas, monospace;
+      font-size: 13px;
+    }
+    /* hljs theme tweaks for warm cream bg */
+    .msg-assistant .hljs { background: transparent !important; padding: 0 !important; color: var(--ink); }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(8px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .fade-up { animation: fadeUp .35s ease both; }
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to   { opacity: 1; }
+    }
+    .fade-in { animation: fadeIn .25s ease both; }
+    @keyframes pulse {
+      0%, 100% { opacity: .35; }
+      50%      { opacity: 1; }
+    }
+    .thinking-dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: var(--ink);
+      animation: pulse 1.2s ease-in-out infinite;
+    }
+    .thinking-dot:nth-child(2) { animation-delay: .15s; }
+    .thinking-dot:nth-child(3) { animation-delay: .3s; }
+    .toast {
+      position: fixed; top: 24px; left: 50%; transform: translateX(-50%);
+      background: var(--ink); color: #fff;
+      padding: 10px 20px; border-radius: 9999px; font-size: 13px;
+      box-shadow: 0 8px 24px rgba(0,0,0,.20);
+      animation: fadeUp .25s ease both;
+      z-index: 50;
+    }
+    .scroll { overflow-y: auto; scrollbar-width: thin; scrollbar-color: rgba(0,0,0,.15) transparent; scroll-behavior: smooth; }
+    .scroll::-webkit-scrollbar { width: 6px; }
+    .scroll::-webkit-scrollbar-thumb { background: rgba(0,0,0,.15); border-radius: 3px; }
+
+    /* Connection status dot */
+    .status-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: #6abf69;
+      transition: background .3s;
+    }
+    .status-dot.disconnected { background: #c66; animation: pulse 1s ease-in-out infinite; }
+
+    /* Settings panel — subtle, no dark backdrop */
+    .panel-backdrop {
+      position: fixed;
+      inset: 0;
+      background: transparent;
+      z-index: 40;
+    }
+    .panel {
+      position: fixed;
+      top: 0; right: 0; bottom: 0;
+      width: min(420px, 92vw);
+      background: var(--cream);
+      border-left: 1px solid rgba(0,0,0,.06);
+      box-shadow: -16px 0 40px rgba(0,0,0,.06);
+      z-index: 41;
+      display: flex;
+      flex-direction: column;
+      animation: slideIn .22s ease both;
+    }
+    @keyframes slideIn {
+      from { transform: translateX(20px); opacity: 0; }
+      to   { transform: translateX(0); opacity: 1; }
+    }
+    .panel-header {
+      padding: 24px 28px 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .panel-header h2 {
+      font-size: 22px;
+      font-weight: 600;
+      letter-spacing: -.01em;
+    }
+    .panel-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px 28px 28px;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(0,0,0,.15) transparent;
+    }
+    .panel-body::-webkit-scrollbar { width: 6px; }
+    .panel-body::-webkit-scrollbar-thumb { background: rgba(0,0,0,.15); border-radius: 3px; }
+    .panel-section {
+      margin-top: 22px;
+    }
+    .panel-section-title {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      color: var(--muted);
+      margin-bottom: 10px;
+    }
+    .panel-card {
+      background: rgba(255,255,255,.55);
+      border-radius: 16px;
+      padding: 14px 16px;
+      margin-bottom: 8px;
+    }
+    .panel-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 0;
+      font-size: 14px;
+    }
+    .panel-row + .panel-row { border-top: 1px solid rgba(0,0,0,.05); }
+    .panel-row .key { color: var(--muted); }
+    .panel-row .val { font-weight: 500; }
+    .panel-action {
+      width: 100%;
+      padding: 12px 14px;
+      border-radius: 12px;
+      background: transparent;
+      border: 0;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--ink);
+      text-align: left;
+      transition: background .15s, color .15s;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 2px;
+    }
+    .panel-action:hover { background: rgba(0,0,0,.05); }
+    .panel-action.danger { color: #c33; }
+    .panel-action.danger:hover { background: rgba(204, 51, 51, .08); }
+    .panel-action .pa-icon {
+      width: 32px; height: 32px;
+      display: grid;
+      place-items: center;
+      border-radius: 9px;
+      background: rgba(0,0,0,.04);
+      color: var(--ink);
+      flex-shrink: 0;
+    }
+    .panel-action.danger .pa-icon { background: rgba(204,51,51,.08); color: #c33; }
+    .panel-action .pa-label { flex: 1; min-width: 0; }
+    .panel-action .pa-title { font-weight: 500; font-size: 14px; line-height: 1.2; }
+    .panel-action .pa-desc { font-size: 11.5px; color: var(--muted); margin-top: 2px; line-height: 1.3; font-weight: 400; }
+    .panel-action .arrow { color: var(--muted); opacity: .5; }
+    .panel-action:hover .arrow { opacity: 1; }
+    .panel-search {
+      width: 100%;
+      padding: 12px 16px;
+      border-radius: 12px;
+      border: 1px solid rgba(0,0,0,.1);
+      background: rgba(255,255,255,.7);
+      font-family: inherit;
+      font-size: 14px;
+      outline: 0;
+      color: var(--ink);
+      transition: border-color .15s;
+    }
+    .panel-search:focus { border-color: var(--ink); }
+    .panel-back {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 10px 6px 6px;
+      border-radius: 9px;
+      background: transparent;
+      color: var(--muted);
+      border: 0;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 500;
+      margin-bottom: 8px;
+      transition: background .15s, color .15s;
+    }
+    .panel-back:hover { background: rgba(0,0,0,.05); color: var(--ink); }
+    .panel-toggle {
+      position: relative;
+      display: inline-block;
+      width: 40px; height: 24px;
+      background: rgba(0,0,0,.18);
+      border-radius: 9999px;
+      cursor: pointer;
+      transition: background .2s;
+      border: 0;
+      padding: 0;
+      flex-shrink: 0;
+      vertical-align: middle;
+    }
+    .panel-toggle::after {
+      content: '';
+      position: absolute;
+      display: block;
+      top: 3px; left: 3px;
+      width: 18px; height: 18px;
+      background: #fff;
+      border-radius: 50%;
+      box-shadow: 0 1px 3px rgba(0,0,0,.2);
+      transition: transform .2s ease;
+    }
+    .panel-toggle.on { background: var(--ink); }
+    .panel-toggle.on::after { transform: translateX(16px); }
+    .panel-select {
+      padding: 6px 10px;
+      border-radius: 8px;
+      border: 1px solid rgba(0,0,0,.12);
+      background: var(--cream);
+      font-family: inherit;
+      font-size: 12px;
+      cursor: pointer;
+      color: var(--ink);
+    }
+    .perm-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 0;
+      font-size: 13px;
+      gap: 12px;
+    }
+    .perm-row + .perm-row { border-top: 1px solid rgba(0,0,0,.05); }
+    .perm-row .perm-label { flex: 1; min-width: 0; }
+    .perm-row .perm-name { font-weight: 500; }
+    .perm-row .perm-desc { font-size: 11px; color: var(--muted); margin-top: 2px; }
+    .mem-entry {
+      padding: 10px 0;
+      font-size: 13px;
+      border-bottom: 1px solid rgba(0,0,0,.05);
+    }
+    .mem-entry .mem-tag {
+      display: inline-block;
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      padding: 2px 8px;
+      border-radius: 6px;
+      background: rgba(0,0,0,.06);
+      color: var(--ink);
+      margin-right: 8px;
+    }
+    .mem-entry .mem-content {
+      color: var(--muted);
+      margin-top: 4px;
+      line-height: 1.4;
+    }
+  </style>
+</head>
+<body>
+  <div x-data="cellApp()" x-init="init()" class="h-screen flex flex-col">
+
+    <!-- Top-left: mode nav -->
+    <div class="absolute top-6 left-6 z-30 flex flex-col gap-2 items-start">
+      <button class="pill" :class="mode === 'space' ? '' : 'inactive'" @click="setMode('space')">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.17 14.83a4 4 0 1 1 0-5.66l5.66 5.66a4 4 0 1 0 0-5.66"/></svg>
+        Space
+      </button>
+      <button class="pill" :class="mode === 'chat' ? '' : 'inactive'" @click="setMode('chat')">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        Chats
+      </button>
+    </div>
+
+    <!-- Top-center: chat header (when in chat) -->
+    <div x-show="mode === 'chat' && currentChat" x-cloak class="absolute top-6 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2 fade-in">
+      <button @click="closeChat()" class="pill ghost" title="Back to chats">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+        <span x-text="currentChat ? currentChat.title : ''" class="max-w-[280px] truncate"></span>
+      </button>
+    </div>
+
+    <!-- Top-right: connection dot + Menu -->
+    <div class="absolute top-6 right-6 z-30 flex items-center gap-2">
+      <span class="status-dot" :class="connected ? '' : 'disconnected'" :title="connected ? 'Connected' : 'Reconnecting…'"></span>
+      <button class="menu-btn" @click="openPanel()" title="Settings">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        Settings
+      </button>
+    </div>
+
+    <!-- Messages / Chat list -->
+    <main class="flex-1 scroll px-6 pt-28 pb-32" id="msgs">
+      <div class="max-w-3xl mx-auto flex flex-col gap-5">
+
+        <!-- Chat list view -->
+        <template x-if="mode === 'chat' && !currentChat">
+          <div class="flex flex-col items-center pt-10 pb-32 fade-up" style="max-width: 720px; margin: 0 auto; width: 100%;">
+            <button @click="newChat()" class="chat-pill-new">+ New Chat</button>
+            <div class="chats-grid" x-show="chats.length > 0">
+              <template x-for="c in chats" :key="c.id">
+                <button @click="openChat(c.id)" class="chat-pill">
+                  <span class="chat-title" x-text="c.title || 'Untitled'"></span>
+                  <span class="chat-meta" x-show="c.messages" x-text="(c.messages || 0) + ' msg'"></span>
+                  <span class="chat-del" @click.stop="deleteChat(c.id)" title="Delete">×</span>
+                </button>
+              </template>
+            </div>
+            <div x-show="chats.length === 0" class="text-sm mt-10" style="color:var(--muted)">No chats yet — start one above.</div>
+          </div>
+        </template>
+
+        <!-- Empty state for space (no messages) -->
+        <template x-if="mode === 'space' && messages.length === 0 && !thinking">
+          <div class="hero">
+            <span>Hi. </span><span class="accent">What's on your mind?</span>
+          </div>
+        </template>
+
+        <!-- Empty state for new empty chat -->
+        <template x-if="mode === 'chat' && currentChat && messages.length === 0 && !thinking">
+          <div class="hero">
+            <span class="accent">A fresh thread.</span><br>
+            <span class="text-base">Anything to start with?</span>
+          </div>
+        </template>
+
+        <!-- Messages view -->
+        <template x-if="mode !== 'chat' || currentChat">
+          <template x-for="(m, i) in messages" :key="i">
+            <div class="fade-up flex flex-col">
+              <template x-if="m.role === 'assistant'">
+                <div class="msg-assistant" x-data="{ copied: false }">
+                  <div x-html="renderMd(m.content)"></div>
+                  <button class="copy-btn" :class="{ copied }"
+                          @click="copyText(m.content); copied = true; setTimeout(() => copied = false, 1400)"
+                          :title="copied ? 'Copied!' : 'Copy'">
+                    <svg x-show="!copied" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                    <svg x-show="copied" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                  </button>
+                </div>
+              </template>
+              <template x-if="m.role === 'user'">
+                <div class="msg-user" x-text="m.content"></div>
+              </template>
+              <template x-if="m.role === 'system'">
+                <div class="msg-system" x-html="renderSystem(m.content)"></div>
+              </template>
+            </div>
+          </template>
+        </template>
+
+        <div x-show="thinking" class="flex gap-1.5 items-center pt-2 fade-up">
+          <span class="thinking-dot"></span>
+          <span class="thinking-dot"></span>
+          <span class="thinking-dot"></span>
+        </div>
+      </div>
+    </main>
+
+    <!-- Toasts -->
+    <template x-for="t in toasts" :key="t.id">
+      <div class="toast" x-text="t.text"></div>
+    </template>
+
+    <!-- Input -->
+    <footer x-show="mode !== 'chat' || currentChat" class="absolute bottom-6 left-0 right-0 flex justify-center z-20">
+      <form @submit.prevent="send()" class="input-bar">
+        <textarea
+          x-ref="input"
+          x-model="draft"
+          rows="1"
+          @input="autoGrow($event)"
+          @keydown.enter="onEnter($event)"
+          :placeholder="mode === 'space' ? 'Ask me anything…' : (currentChat ? 'Reply…' : 'Pick or start a chat first')"
+          :disabled="mode === 'chat' && !currentChat"
+        ></textarea>
+        <button type="button"
+                x-show="thinking"
+                @click="stopThinking()"
+                class="send-btn stop"
+                aria-label="Stop">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
+        </button>
+        <button type="submit"
+                x-show="!thinking"
+                class="send-btn"
+                :disabled="!draft.trim() || (mode === 'chat' && !currentChat)"
+                aria-label="Send">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
+        </button>
+      </form>
+    </footer>
+
+    <!-- Settings panel -->
+    <template x-if="panelOpen">
+      <div>
+        <div class="panel-backdrop" @click="closePanel()"></div>
+        <aside class="panel">
+          <div class="panel-header">
+            <h2>Settings</h2>
+            <button class="icon-btn" @click="closePanel()" title="Close">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          </div>
+          <div class="panel-body">
+
+            <!-- View: root -->
+            <template x-if="panelView === 'root'">
+              <div>
+                <div class="panel-section">
+                  <button class="panel-action" @click="openPanelView('memory')">
+                    <span class="pa-icon">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v1a3 3 0 0 0-3 3v1a3 3 0 0 0-2 5.5A3 3 0 0 0 7 21h10a3 3 0 0 0 3-5.5A3 3 0 0 0 18 10V9a3 3 0 0 0-3-3V5a3 3 0 0 0-3-3z"/></svg>
+                    </span>
+                    <span class="pa-label">
+                      <div class="pa-title">What I remember</div>
+                      <div class="pa-desc">Browse and search your saved facts</div>
+                    </span>
+                    <span class="arrow">›</span>
+                  </button>
+
+                  <button class="panel-action" @click="openPanelView('ambient')">
+                    <span class="pa-icon">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v6m0 10v6M4.22 4.22l4.24 4.24m7.08 7.08l4.24 4.24M1 12h6m10 0h6M4.22 19.78l4.24-4.24m7.08-7.08l4.24-4.24"/></svg>
+                    </span>
+                    <span class="pa-label">
+                      <div class="pa-title">Background mode</div>
+                      <div class="pa-desc">Let the agent think on its own</div>
+                    </span>
+                    <span class="arrow">›</span>
+                  </button>
+
+                  <button class="panel-action" @click="openPanelView('permissions')">
+                    <span class="pa-icon">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                    </span>
+                    <span class="pa-label">
+                      <div class="pa-title">Permissions</div>
+                      <div class="pa-desc">Choose what the agent can do without asking</div>
+                    </span>
+                    <span class="arrow">›</span>
+                  </button>
+                </div>
+
+                <div class="panel-section">
+                  <div class="panel-section-title">Conversation</div>
+                  <button class="panel-action" @click="confirmClear()">
+                    <span class="pa-icon">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+                    </span>
+                    <span class="pa-label">
+                      <div class="pa-title">Start fresh</div>
+                      <div class="pa-desc">Clear current conversation history</div>
+                    </span>
+                    <span class="arrow">›</span>
+                  </button>
+                </div>
+
+                <div class="panel-section">
+                  <div class="panel-section-title">Advanced</div>
+                  <button class="panel-action" @click="openPanelView('status')">
+                    <span class="pa-icon">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20v-6m0 0V4m0 10l-4-4m4 4l4-4"/></svg>
+                    </span>
+                    <span class="pa-label">
+                      <div class="pa-title">Agent status</div>
+                      <div class="pa-desc">Internal state and memory layers</div>
+                    </span>
+                    <span class="arrow">›</span>
+                  </button>
+
+                  <button class="panel-action" @click="cmdAmbientNow()">
+                    <span class="pa-icon">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+                    </span>
+                    <span class="pa-label">
+                      <div class="pa-title">Ambient tick now</div>
+                      <div class="pa-desc">Trigger one background tick manually</div>
+                    </span>
+                    <span class="arrow">›</span>
+                  </button>
+
+                  <button class="panel-action danger" @click="confirmReset()">
+                    <span class="pa-icon">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                    </span>
+                    <span class="pa-label">
+                      <div class="pa-title">Reset everything</div>
+                      <div class="pa-desc">Wipe memory, settings, and saved chats</div>
+                    </span>
+                    <span class="arrow">›</span>
+                  </button>
+                </div>
+              </div>
+            </template>
+
+            <!-- View: status -->
+            <template x-if="panelView === 'status'">
+              <div>
+                <button class="panel-back" @click="panelView = 'root'">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+                  Back
+                </button>
+                <div class="panel-section">
+                  <div class="panel-section-title">Agent state</div>
+                  <div class="panel-card" x-show="statusData">
+                    <div class="panel-row">
+                      <span class="key">Turn</span>
+                      <span class="val" x-text="statusData?.turn ?? '—'"></span>
+                    </div>
+                    <div class="panel-row">
+                      <span class="key">Lambda (memory decay)</span>
+                      <span class="val" x-text="statusData?.lambda_m ?? '—'"></span>
+                    </div>
+                    <template x-for="(count, layer) in (statusData?.layers || {})" :key="layer">
+                      <div class="panel-row">
+                        <span class="key" x-text="layer.charAt(0).toUpperCase() + layer.slice(1) + ' memory'"></span>
+                        <span class="val" x-text="count + ' entries'"></span>
+                      </div>
+                    </template>
+                  </div>
+                  <div class="panel-card" x-show="statusData?.core_profile">
+                    <div class="panel-section-title" style="margin-bottom: 6px;">Core profile</div>
+                    <div style="font-size: 13px; line-height: 1.5; color: var(--ink-soft);" x-text="statusData?.core_profile"></div>
+                  </div>
+                </div>
+              </div>
+            </template>
+
+            <!-- View: memory -->
+            <template x-if="panelView === 'memory'">
+              <div>
+                <button class="panel-back" @click="panelView = 'root'">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+                  Back
+                </button>
+                <div class="panel-section">
+                  <input class="panel-search" type="text"
+                         placeholder="Search memory…"
+                         x-model="memoryQuery"
+                         @input.debounce.300ms="searchMemory()" />
+                  <div style="margin-top: 12px;">
+                    <template x-if="memoryEntries.length === 0">
+                      <div style="color: var(--muted); font-size: 13px; padding: 12px 0;" x-text="memoryQuery ? 'No matches.' : 'Memory is empty.'"></div>
+                    </template>
+                    <template x-for="e in memoryEntries" :key="e.filename">
+                      <div class="mem-entry">
+                        <span class="mem-tag" x-text="e.layer"></span>
+                        <span style="font-weight: 500;" x-text="e.filename"></span>
+                        <div class="mem-content" x-text="e.content"></div>
+                      </div>
+                    </template>
+                  </div>
+                </div>
+              </div>
+            </template>
+
+            <!-- View: ambient -->
+            <template x-if="panelView === 'ambient'">
+              <div>
+                <button class="panel-back" @click="panelView = 'root'">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+                  Back
+                </button>
+                <div class="panel-section">
+                  <div class="panel-card">
+                    <div class="panel-row">
+                      <span class="key">Enabled</span>
+                      <button class="panel-toggle"
+                              :class="ambientData?.enabled ? 'on' : ''"
+                              @click="toggleAmbient()"
+                              :aria-pressed="ambientData?.enabled ? 'true' : 'false'"></button>
+                    </div>
+                    <div class="panel-row">
+                      <span class="key">Interval</span>
+                      <span class="val" x-text="(ambientData?.interval_minutes ?? '—') + ' min'"></span>
+                    </div>
+                    <div class="panel-row">
+                      <span class="key">Quiet hours</span>
+                      <span class="val" x-text="ambientQuiet()"></span>
+                    </div>
+                    <div class="panel-row">
+                      <span class="key">Daily cap</span>
+                      <span class="val" x-text="(ambientData?.max_per_day ?? '—') + ' (' + (ambientData?.today_count || 0) + ' today)'"></span>
+                    </div>
+                    <div class="panel-row">
+                      <span class="key">Cooldown</span>
+                      <span class="val" x-text="(ambientData?.cooldown_after_user_min ?? '—') + ' min'"></span>
+                    </div>
+                    <div class="panel-row">
+                      <span class="key">Last tick</span>
+                      <span class="val" x-text="ambientData?.last_tick_min_ago != null ? (ambientData.last_tick_min_ago + ' min ago') : '—'"></span>
+                    </div>
+                  </div>
+                  <button class="panel-action" @click="cmdAmbientNow()">
+                    <span>Trigger ambient tick now</span>
+                    <span class="arrow">↻</span>
+                  </button>
+                </div>
+              </div>
+            </template>
+
+            <!-- View: permissions -->
+            <template x-if="panelView === 'permissions'">
+              <div>
+                <button class="panel-back" @click="panelView = 'root'">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+                  Back
+                </button>
+                <div class="panel-section">
+                  <div class="panel-card">
+                    <template x-for="p in permissionsData?.policies || []" :key="p.type">
+                      <div class="perm-row">
+                        <div class="perm-label">
+                          <div class="perm-name" x-text="p.type"></div>
+                          <div class="perm-desc" x-text="p.label"></div>
+                        </div>
+                        <select class="panel-select"
+                                @change="setPermission(p.type, $event.target.value)">
+                          <template x-for="pol in (permissionsData?.valid_policies || [])" :key="pol">
+                            <option :value="pol" :selected="p.policy === pol" x-text="pol.replace('_', ' ')"></option>
+                          </template>
+                        </select>
+                      </div>
+                    </template>
+                  </div>
+                </div>
+              </div>
+            </template>
+
+          </div>
+        </aside>
+      </div>
+    </template>
+
+  </div>
+
+  <script src="/static/app.js?v=8"></script>
+</body>
+</html>

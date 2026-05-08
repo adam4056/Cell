@@ -19,7 +19,7 @@ from core import (
     settings,
     telegram_bot,
 )
-from core.core import process, start_scheduler
+from core.core import _run_ambient_tick, process, start_scheduler
 from core.memory_engine import engine as memory_engine
 
 
@@ -44,7 +44,8 @@ class CellCLI:
 
         with self.term.cbreak(), self.term.hidden_cursor():
             # Start background
-            start_scheduler(ambient_interval=0)
+            start_scheduler()
+            self._init_mcp()
             permissions.set_dialog(self._ask_permission)
             telegram_bot.start()
             self._start_inbox_thread()
@@ -193,6 +194,10 @@ class CellCLI:
                 "  /reset             — factory reset\n"
                 "  /permission        — list permissions\n"
                 "  /permission <t> <p>— set policy (always_allow/ask/always_deny)\n"
+                "  /ambient           — show ambient agent status\n"
+                "  /ambient on|off|now— toggle proactive agent or tick now\n"
+                "  /model             — list available models\n"
+                "  /model <name>      — switch to model (e.g. claude-sonnet-4-20250514)\n"
                 "  /quit              — exit"
             )
         elif cmd == "/clear":
@@ -212,6 +217,10 @@ class CellCLI:
             self._cmd_status()
         elif base == "/permission":
             self._cmd_permission(parts)
+        elif cmd == "/ambient":
+            self._cmd_ambient(parts)
+        elif base == "/model":
+            self._cmd_model(parts)
         elif cmd == "/quit":
             self._running = False
             return
@@ -282,9 +291,110 @@ class CellCLI:
         else:
             self._add_system("Usage: /permission | /permission <type> <policy>")
 
+    def _cmd_ambient(self, parts: list):
+        from core import memory_store
+
+        cfg = settings.ambient_config()
+        if len(parts) == 1 or parts[1] == "status":
+            count_today = memory_store.get("ambient.tick_count") or "0"
+            tick_date = memory_store.get("ambient.tick_date") or "—"
+            last_tick = memory_store.get("ambient.last_tick_ts")
+            last_str = "—"
+            if last_tick:
+                try:
+                    delta_min = int((time.time() - float(last_tick)) / 60)
+                    last_str = f"{delta_min} min ago"
+                except (TypeError, ValueError):
+                    pass
+            qh = cfg.get("quiet_hours") or [0, 0]
+            self._add_system(
+                "Ambient agent:\n"
+                f"  enabled:        {cfg.get('enabled')}\n"
+                f"  interval:       {cfg.get('interval_minutes')} min\n"
+                f"  quiet hours:    {qh[0]:02d}:00 - {qh[1]:02d}:00\n"
+                f"  daily cap:      {cfg.get('max_per_day')} (today: {count_today} on {tick_date})\n"
+                f"  cooldown:       {cfg.get('cooldown_after_user_min')} min after user msg\n"
+                f"  last tick:      {last_str}"
+            )
+            return
+        action = parts[1].lower()
+        if action == "on":
+            settings.set_ambient("enabled", True)
+            self._add_system(
+                f"Ambient agent enabled. Tick every {cfg.get('interval_minutes')} min."
+            )
+        elif action == "off":
+            settings.set_ambient("enabled", False)
+            self._add_system("Ambient agent disabled.")
+        elif action == "now":
+            self._add_system("Triggering ambient tick...")
+            self._draw()
+
+            def worker():
+                try:
+                    result = _run_ambient_tick(force=True)
+                except Exception as e:
+                    result = f"[SYSTEM ERROR] {e}"
+                if result:
+                    self._add_system(
+                        result if result.startswith("[") else f"[AMBIENT] {result}"
+                    )
+                else:
+                    self._add_system("[AMBIENT] (silent — nothing to do)")
+                self._draw()
+
+            threading.Thread(target=worker, daemon=True).start()
+        else:
+            self._add_system(
+                "Usage: /ambient | /ambient on | /ambient off | /ambient now"
+            )
+
+    def _cmd_model(self, parts: list):
+        from core.proxy import set_model, set_cheap_model
+        from core.providers import list_providers as _list_providers
+
+        if len(parts) == 1:
+            providers = _list_providers()
+            if not providers:
+                self._add_system(
+                    "No providers configured. Using default from config.yaml."
+                )
+                return
+            lines = ["Available models:"]
+            for p in providers:
+                lines.append(f"  /model {p}")
+            self._add_system("\n".join(lines))
+            return
+        model_name = parts[1].lower()
+        try:
+            set_model(model_name)
+            if parts[1] != model_name:
+                self._add_system(f"Model set to '{model_name}'.")
+            else:
+                self._add_system(f"Model set to '{model_name}'.")
+        except Exception as e:
+            self._add_system(f"Error: {e}")
+
     def _ask_permission(self, operation: str, detail: str) -> str:
         # In CLI mode, auto-allow for now
         return "allow"
+
+    def _init_mcp(self):
+        try:
+            from core.mcp_client import load_servers
+            import yaml
+            import os
+
+            config_path = os.path.join(os.path.dirname(__file__), "..", "config.yaml")
+            with open(config_path, "r", encoding="utf-8") as f:
+                cfg = yaml.safe_load(f) or {}
+            mcp_configs = cfg.get("mcp_servers")
+            if mcp_configs:
+                count = load_servers(mcp_configs)
+                if count:
+                    self._add_system(f"MCP: {count} server(s) connected.")
+        except Exception:
+            pass
 
     def _add_user(self, text: str):
         self.messages.append(("user", text))

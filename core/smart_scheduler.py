@@ -42,7 +42,8 @@ Current time: {datetime.now().isoformat()}
                     "content": "You are a schedule parser. Output ONLY valid JSON.",
                 },
                 {"role": "user", "content": prompt},
-            ]
+            ],
+            cheap=True,
         )
         # Extract JSON
         import json

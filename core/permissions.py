@@ -99,6 +99,12 @@ def _prompt_with_timeout(perm_type: str, detail: str) -> str:
 
 def request(perm_type: str, detail: str) -> str:
     """Returns 'allow', 'deny', or 'skip'. Persists 'always_*' decisions."""
+    policy = get_policy(perm_type)
+    if policy == "always_allow":
+        return "allow"
+    if policy == "always_deny":
+        return "deny"
+
     saved = _saved_decision(perm_type, detail)
     if saved == "always_allow":
         return "allow"

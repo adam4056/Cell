@@ -1,53 +1,63 @@
 import os
-import requests
-import yaml
+import threading
+
+from core.providers import get_provider, list_providers, ProviderError
 
 DEFAULT_TIMEOUT = 60
 
-_config_path = os.path.join(os.path.dirname(__file__), "..", "config.yaml")
-with open(_config_path, "r", encoding="utf-8") as _f:
-    _cfg = yaml.safe_load(_f) or {}
+_lock = threading.Lock()
+_provider_name: str | None = None
+_cheap_provider_name: str | None = None
 
-# OpenAI-compatible config (works for Ollama via /v1, DeepSeek, etc.)
-_api_base = (_cfg.get("api_base") or "https://api.deepseek.com").rstrip("/")
-_api_key = _cfg.get("api_key") or _cfg.get("deepseek_api_key", "") or "noauth"
-DEFAULT_MODEL = _cfg.get("model") or "deepseek-chat"
-API_URL = _api_base + "/chat/completions"
+_cache: dict[str, object] = {}
 
 
-class ProxyAPIError(Exception):
-    pass
-
-
-_last_usage: dict = {}
+def _get(name: str | None = None) -> object:
+    key = name or "__default__"
+    with _lock:
+        if key not in _cache:
+            _cache[key] = get_provider(name)
+    return _cache[key]
 
 
 def get_last_usage() -> dict:
-    return _last_usage
+    return _get(_provider_name).get_last_usage()  # type: ignore[union-attr]
 
 
-def chat(messages: list, tools: list | None = None, model: str | None = None, timeout: int = DEFAULT_TIMEOUT) -> dict:
-    global _last_usage
-    payload = {"model": model or DEFAULT_MODEL, "messages": messages}
-    if tools:
-        payload["tools"] = tools
-        payload["tool_choice"] = "auto"
-    response = requests.post(
-        API_URL,
-        headers={
-            "Authorization": f"Bearer {_api_key}",
-            "Content-Type": "application/json",
-        },
-        json=payload,
+def set_model(model_name: str) -> None:
+    global _provider_name
+    _provider_name = model_name
+    _cache.pop("__default__", None)
+    _cache.pop(model_name, None)
+
+
+def set_cheap_model(model_name: str) -> None:
+    global _cheap_provider_name
+    _cheap_provider_name = model_name
+
+
+def chat(
+    messages: list,
+    tools: list | None = None,
+    model: str | None = None,
+    timeout: int = DEFAULT_TIMEOUT,
+    cheap: bool = False,
+) -> dict:
+    provider = _get(_cheap_provider_name if cheap else _provider_name)
+    return provider.chat(  # type: ignore[union-attr]
+        messages=messages,
+        tools=tools,
+        model=model,
         timeout=timeout,
     )
-    if not response.ok:
-        body = (response.text or "").strip()[:2000]
-        raise ProxyAPIError(f"{response.status_code} {response.reason}: {body}")
-    data = response.json()
-    _last_usage = data.get("usage", {})
-    return data["choices"][0]["message"]
 
 
-def request(messages: list, model: str | None = None) -> str:
-    return chat(messages, model=model).get("content", "")
+def request(
+    messages: list,
+    model: str | None = None,
+    cheap: bool = False,
+) -> str:
+    return chat(messages, model=model, cheap=cheap).get("content", "")
+
+
+ProxyAPIError = ProviderError

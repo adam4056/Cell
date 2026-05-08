@@ -73,6 +73,7 @@ def done(response: str) -> None:
 
 # --- LLM ---
 
+
 class _LLM:
     def chat(self, messages, tools=None, model=None, timeout=None):
         params = {"messages": messages}
@@ -90,11 +91,25 @@ llm = _LLM()
 
 # --- Self-improve ---
 
+
 def self_improve(filename: str, code: str, description: str) -> str:
     return _call("self_improve", filename=filename, code=code, description=description)
 
 
+# --- MCP ---
+
+
+def mcp_call_tool(server_name: str, tool_name: str, arguments: dict) -> str:
+    return _call(
+        "mcp.call_tool",
+        server_name=server_name,
+        tool_name=tool_name,
+        arguments=arguments,
+    )
+
+
 # --- Inbox ---
+
 
 class _Inbox:
     def post(self, message: str) -> None:
@@ -105,6 +120,7 @@ inbox = _Inbox()
 
 
 # --- Memory ---
+
 
 class _Memory:
     def get(self, key: str):
@@ -124,6 +140,7 @@ memory_store = _Memory()
 
 
 # --- Scheduler ---
+
 
 class _Scheduler:
     def add(self, task_id, description, interval_seconds=None, run_at=None):
@@ -146,6 +163,7 @@ scheduler = _Scheduler()
 
 
 # --- Host (gated by user permission dialog in Core) ---
+
 
 class _Host:
     def read_file(self, path: str) -> str:
