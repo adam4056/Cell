@@ -12,6 +12,24 @@ DYNAMIC_FUNCTIONS_DIR = os.path.join(os.path.dirname(__file__), "functions")
 SKILLS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "skills")
 MAX_ITERATIONS = 150
 
+SMART_INTERACTION_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "smart_interaction",
+        "description": "Request credentials or configuration from the user via a human-friendly dialog. Write prompts conversationally — the user sees them directly. Use this when you need API keys, tokens, MCP server URLs, or any config the user must supply. You receive only confirmation — NEVER the secret value.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "key": {"type": "string", "description": "Credential key in UPPER_SNAKE_CASE, e.g. 'OPENWEATHER_API_KEY'."},
+                "label": {"type": "string", "description": "Short human name for this credential, e.g. 'OpenWeather API key'."},
+                "prompt": {"type": "string", "description": "Friendly explanation the user will READ in the dialog."},
+                "secret": {"type": "boolean", "description": "True for secrets (API keys — input shown as ***). Default true."},
+            },
+            "required": ["key", "label", "prompt"],
+        },
+    },
+}
+
 NOTIFY_TOOL = {
     "type": "function",
     "function": {
