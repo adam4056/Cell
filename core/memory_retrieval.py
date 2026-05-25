@@ -28,6 +28,44 @@ _cache: dict[str, dict[str, Any]] | None = None
 _model_lock = threading.Lock()
 
 
+def _hash(text: str) -> str:
+    return hashlib.sha1(text.encode("utf-8")).hexdigest()[:16]
+
+
+def _load_cache() -> dict[str, dict[str, Any]]:
+    global _cache
+    if _cache is not None:
+        return _cache
+    if not os.path.exists(CACHE_FILE):
+        _cache = {}
+        return _cache
+    try:
+        with open(CACHE_FILE, "r", encoding="utf-8") as f:
+            _cache = json.load(f)
+    except Exception:
+        _cache = {}
+    return _cache
+
+
+def _save_cache() -> None:
+    if _cache is None:
+        return
+    os.makedirs(MEMORY_DIR, exist_ok=True)
+    with _LOCK:
+        with open(CACHE_FILE, "w", encoding="utf-8") as f:
+            json.dump(_cache, f, ensure_ascii=False)
+
+
+def reset_cache() -> None:
+    global _cache
+    _cache = {}
+    if os.path.exists(CACHE_FILE):
+        try:
+            os.remove(CACHE_FILE)
+        except OSError:
+            pass
+
+
 def _get_model():
     global _model, _model_failed
     if _model is not None:
