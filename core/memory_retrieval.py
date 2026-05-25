@@ -25,30 +25,43 @@ _model = None
 _model_failed = False
 _model_loading = False
 _cache: dict[str, dict[str, Any]] | None = None
+_model_lock = threading.Lock()
 
 
 def _get_model():
     global _model, _model_failed
-    if _model is not None or _model_failed:
+    if _model is not None:
         return _model
-    try:
-        from sentence_transformers import SentenceTransformer  # type: ignore
+    if _model_failed:
+        return None
+    with _model_lock:
+        if _model is not None:
+            return _model
+        if _model_failed:
+            return None
+        try:
+            from sentence_transformers import SentenceTransformer
 
-        _model = SentenceTransformer(MODEL_NAME)
-    except Exception:
-        _model_failed = True
-        _model = None
+            _model = SentenceTransformer(MODEL_NAME)
+        except Exception:
+            _model_failed = True
+            _model = None
     return _model
 
 
 def preload_model():
     """Load the sentence-transformers model in background. Call at app startup."""
-    def _load():
-        try:
-            _get_model()
-        except Exception:
-            pass
-    threading.Thread(target=_load, daemon=True).start()
+    threading.Thread(target=_get_model, daemon=True).start()
+
+
+def _load_model_bg():
+    global _model_loading
+    try:
+        _get_model()
+    except Exception:
+        pass
+    finally:
+        _model_loading = False
 
 
 def _encode(text: str) -> list[float] | None:
@@ -60,16 +73,11 @@ def _encode(text: str) -> list[float] | None:
         return [float(x) for x in vec[0]]
     if _model_loading:
         return None
-    _model_loading = True
-    def _load():
-        global _model, _model_loading
-        try:
-            _get_model()
-        except Exception:
-            pass
-        finally:
-            _model_loading = False
-    threading.Thread(target=_load, daemon=True).start()
+    with _model_lock:
+        if _model_loading:
+            return None
+        _model_loading = True
+    threading.Thread(target=_load_model_bg, daemon=True).start()
     return None
 
 
