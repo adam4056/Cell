@@ -23,45 +23,8 @@ MODEL_NAME = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
 _LOCK = threading.Lock()
 _model = None
 _model_failed = False
+_model_loading = False
 _cache: dict[str, dict[str, Any]] | None = None
-
-
-def _hash(text: str) -> str:
-    return hashlib.sha1(text.encode("utf-8")).hexdigest()[:16]
-
-
-def _load_cache() -> dict[str, dict[str, Any]]:
-    global _cache
-    if _cache is not None:
-        return _cache
-    if not os.path.exists(CACHE_FILE):
-        _cache = {}
-        return _cache
-    try:
-        with open(CACHE_FILE, "r", encoding="utf-8") as f:
-            _cache = json.load(f)
-    except Exception:
-        _cache = {}
-    return _cache
-
-
-def _save_cache() -> None:
-    if _cache is None:
-        return
-    os.makedirs(MEMORY_DIR, exist_ok=True)
-    with _LOCK:
-        with open(CACHE_FILE, "w", encoding="utf-8") as f:
-            json.dump(_cache, f, ensure_ascii=False)
-
-
-def reset_cache() -> None:
-    global _cache
-    _cache = {}
-    if os.path.exists(CACHE_FILE):
-        try:
-            os.remove(CACHE_FILE)
-        except OSError:
-            pass
 
 
 def _get_model():
@@ -78,12 +41,36 @@ def _get_model():
     return _model
 
 
+def preload_model():
+    """Load the sentence-transformers model in background. Call at app startup."""
+    def _load():
+        try:
+            _get_model()
+        except Exception:
+            pass
+    threading.Thread(target=_load, daemon=True).start()
+
+
 def _encode(text: str) -> list[float] | None:
-    model = _get_model()
-    if model is None:
+    global _model_loading
+    if _model_failed:
         return None
-    vec = model.encode([text], normalize_embeddings=True)
-    return [float(x) for x in vec[0]]
+    if _model is not None:
+        vec = _model.encode([text], normalize_embeddings=True)
+        return [float(x) for x in vec[0]]
+    if _model_loading:
+        return None
+    _model_loading = True
+    def _load():
+        global _model, _model_loading
+        try:
+            _get_model()
+        except Exception:
+            pass
+        finally:
+            _model_loading = False
+    threading.Thread(target=_load, daemon=True).start()
+    return None
 
 
 def _cosine_normed(a: list[float], b: list[float]) -> float:

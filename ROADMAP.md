@@ -24,7 +24,7 @@ Cell is not a chatbot. It is your **personal AI agent** — the only AI tool you
 │  ┌─────────────────────────────────────────────────────┐   │
 │  │  1. CORE BRAIN — Self-improving LLM agent            │   │
 │  │  • Dynamic tool creation via self_improve           │   │
-│  │  • Sandboxed execution with permission gate         │   │
+│  │  • In-process execution with permission gate        │   │
 │  │  • Multi-modal: text, images, audio (future)        │   │
 │  └─────────────────────────────────────────────────────┘   │
 │                                                             │
@@ -65,7 +65,19 @@ Cell is not a chatbot. It is your **personal AI agent** — the only AI tool you
 
 ---
 
-## Current State (v0.5)
+## Current State (v0.6-dev)
+
+**v0.5.1 — "Cleanup" (structural refactor)**
+
+- [x] Merged Core and Brain into single codebase (in-process brain, no subprocess RPC)
+- [x] Removed Web UI (FastAPI + WebSocket) — TUI is the primary interface
+- [x] Removed Docker (Dockerfile, docker-compose) — simplified deployment
+- [x] Removed complex backup/rollback system; replaced with simple function validation (smoke test on self_improve)
+- [x] Tuned system prompts for reuse-first behavior (check built-in + existing tools before self_improve)
+- [x] General codebase cleanup (dead code, empty directories, stale artifacts)
+- [x] New Web UI added to v1.0 roadmap goal
+
+**v0.5 — shipped**
 
 - [x] Self-improving brain (`self_improve`, dynamic functions)
 - [x] Sandboxed execution (subprocess + permission gate)
@@ -85,8 +97,14 @@ Cell is not a chatbot. It is your **personal AI agent** — the only AI tool you
 - [x] **Proactive ambient agent** — ambient loop with anti-spam guards (cooldown, quiet hours, daily cap)
 - [x] **Ambient state snapshot** in prompt (scheduler tasks, goals, recent events, current time)
 - [x] **TUI controls** — `/ambient on|off|status|now`
-- [x] **Web UI** — FastAPI + WebSocket, cream pill design, Space/Chats toggle
 - [x] **Isolated threads** — `chats_store` + `process_chat()`, no memory curation
+- [x] **Editable user prompts** — `/edit` command (TUI) reloads last message into input
+- [x] **Direct file injection** — TUI `/attach <path>`, backend `_format_file_attachment` handles text, PDFs, images
+- [x] **Agent status indicators** — brain events (`→ search_web`, `⏱ llm call #1`) shown as status text next to thinking dots
+- [x] **Personality-aware response shaping** — Big Five vector in `memory_personality.summary()` + `_personality_overlay()` in `build_input`; high Neuroticism → softer tone, high Conscientiousness → structured bullets, etc.
+- [x] **Document parsing** — DOCX (`python-docx`) and XLSX (`openpyxl`) extraction in `_format_file_attachment`
+- [x] **Cost-aware model routing** — heuristic classifier `_classify_complexity()` in `proxy.py`; trivial turns → cheap model; enabled via `auto_route: true` in `config.yaml`
+- [x] **Cancel support** — Ctrl+C in TUI cancels the brain subprocess mid-turn
 
 ---
 
@@ -139,7 +157,6 @@ Goal: **Cell stops being reactive.** It notices things on its own, speaks up on 
   - Decision layer driven by prompt (proactive: surfacing goals, memory connections, patterns)
   - Delivery via `inbox.post(...)` → TUI banner / Telegram push
 - [x] **TUI controls** — `/ambient on|off|status|now`
-- [ ] **File watcher triggers** *(nice-to-have, low priority)* — react to file changes
 
 → *Cell works even when you're not at the keyboard.*
 
@@ -155,9 +172,8 @@ Goal: simplify the proactivity model and make it real.
 
 In code, heartbeat and ambient are **already a single loop today** (`_run_ambient_tick` in `core/core.py:332` — `/heartbeat` just calls `_run_ambient_tick(force=True)`). The split exists only in documentation and UX. On top of that, the prompt in `build_ambient_input` (`core/chat.py:286`) is too conservative ("act only if genuinely due, missed, or broken... do not invent work, do not greet, do not summarize") — that kills the point of proactivity.
 
-- [x] **One name: ambient** — heartbeat disappears from docs and from TUI/Web
+- [x] **One name: ambient** — heartbeat disappears from docs and from TUI
   - TUI: `/ambient on|off|status` stays; `/ambient now` replaces `/heartbeat`
-  - Web UI: one control panel, unified naming
   - README + ROADMAP: one concept, one section
 - [x] **Loosen the prompt** — `build_ambient_input` in `core/chat.py:286`
   - Removed "Do not invent work, do not greet, do not summarize"
@@ -212,139 +228,19 @@ Goal: break the DeepSeek dependency and open up to the MCP ecosystem.
 
 → *Cell is no longer DeepSeek-only and opens up to the MCP ecosystem.*
 
-### v0.6 — "Hands, Eyes, Voice" (browser, voice, image gen)
+### v0.6 — "Restart" (TUI rebuild + smart interaction)
 
-Goal: catch up to Hermes on "action" features.
+Goal: rebuild the TUI from scratch and introduce a secure credential flow that keeps secrets out of LLM context.
 
-- [ ] **Full browser** — `core/browser_full.py` via Playwright
-  - JS rendering, login flows, form filling, screenshot
-  - `fetch_url` stays as the lightweight default; new `browse(url, actions=[...])` for full interaction
-  - Headless / headed switch for debugging
-- [ ] **Voice I/O** *(consider deferring past v0.8 — low differentiation, only catch-up vs Hermes)*
-  - **STT:** Whisper local (CPU+GPU) → text in TUI / Web / Telegram
-  - **TTS:** Piper / Coqui → voice replies
-  - Later: Discord voice channel (live conversation)
-- [ ] **Image generation** — `generate_image(prompt)` via DALL·E / Replicate / local Stable Diffusion
-- [ ] **Document parsing** — DOCX, XLSX, native PDF (`pypdf`, `python-docx`, `openpyxl`)
-- [ ] **Audio messages** — Cell sends a voice memo on Telegram / WhatsApp
-- [ ] **Cost-aware model routing** — per-turn classifier (trivial / medium / complex) → cheapest capable model
-  - Trivial (greeting, short answer) → Haiku / DeepSeek-chat / local
-  - Medium (regular turn with memory retrieval) → Sonnet / DeepSeek-reasoner
-  - Complex (multi-tool, planning, `self_improve`) → Opus / GPT-5
-  - Classifier: heuristics (length, tool count, keywords) + lightweight LLM scorer; cache by prompt hash
-  - Curator already uses a cheap model — generalize the pattern across the whole chat; expected savings 5–10× without quality loss
-- [ ] **Personality-aware response shaping** *(moved from v0.8, low effort high impact)*
-  - User's Big Five vector drives reply style: high Neuroticism → softer tone; high Conscientiousness → structure, bullets
-  - Per-user prompt overlay in `build_input` — no big refactor, just a layer on top of the system prompt
-  - Strengthens the EMA momentum feedback loop: better shaping → more accurate user reactions → more accurate persona
-
-→ *Cell has all the senses and hands Hermes has — and chooses "how much brain" to spend.*
-
-### v0.7 — "Subagents & Reach" (parallelization, channels, marketplace)
-
-Goal: parallel compute + reachable from anywhere + skill sharing.
-
-- [ ] **Subagents** — `runner.spawn_subagent(task, context)`
-  - Wrapper over `run_brain_subprocess` with isolated context
-  - Returns the result without contaminating the main turn
-  - Use: parallel research, batch processing, "delegate to specialist"
-- [ ] **Batch processing** — `cell2 batch <prompts.jsonl>` CLI
-  - Hundreds / thousands of prompts in parallel, JSON output
-  - Per-item subagent
-- [ ] **Discord bot** — analogue of `core/telegram_bot.py`
-- [ ] **Slack bot** — workspace integration
-- [ ] **WhatsApp** — Business API (later Signal, iMessage)
-- [ ] **Email channel** — IMAP poll + SMTP send
-- [ ] **REST API stabilization** — finalize `/api/*`, OpenAPI spec
-- [ ] **Webhook receivers** — GitHub, Sentry, Linear → ambient triggers
-- [ ] **Skill registry**
-  - `brain/functions/*.py` → exportable package (manifest + deps + spec + hash + author)
-  - Compatible with agentskills.io (if the spec allows)
-  - `cell2 skills export <name>` / `cell2 skills install <url>`
-  - **Trust tiers** — an imported skill is not added directly to `brain/functions/`
-    - Tier 0 (untrusted): runs in an isolated subprocess, network=deny, fs=read-only sandbox dir
-    - Tier 1 (probationary): promoted after N successful runs without errors / permission breaches
-    - Tier 2 (trusted): manually approved by user, full permissions per manifest scope
-    - Provenance: hash + source URL + install date in `~/.cell-2/skills.json`
-
-→ *Cell == Hermes feature parity.*
-
-### v0.8 — "Beyond Hermes" (differentiation)
-
-Goal: leverage Cell's unique strengths and surpass Hermes on four axes: memory, self-improvement safety, prediction, local AI.
-
-- [ ] **Self-improving brain v2** — `self_improve` as a production pipeline, not a toy
-  - **LLM-as-reviewer** — independent instance reads every proposed change (security, bugs, regressions)
-  - **Test-driven** — generated function **must** ship with a test; the test runs in the sandbox before merge; fail → old code stays
-  - **Adversarial subagent** — second LLM in a "red team" role tries to break/exploit the change (edge cases, injection, infinite loop)
-  - **Regression memory** — history of everything `self_improve` ever broke; injected into the reviewer's prompt ("you broke this last time — don't try again")
-  - **Lineage tracking** — every generated tool has a parent pointer; periodic pruning of obsolete versions
-- [ ] **Sleep cycle / dream pass** — nightly memory consolidation *(killer feature — no cloud agent does this)*
-  - During quiet hours the agent walks through closed chapters and runs:
-    - **Contradiction sweep** — finds contradictions in Semantic ("user drinks coffee" vs. "user doesn't drink coffee") and resolves via timestamp + frequency
-    - **Redundancy merge** — merges duplicate / similar facts (cosine similarity over embeddings)
-    - **Meta-summary** — from N chapters generates a higher-level abstraction ("over the last 14 days the user worked on refactor X")
-    - **Goal review** — walks Procedural, marks stagnating / completed goals, suggests updates
-  - Implementation: extend `core/memory_curator.py` with a `consolidate()` pass; runs via the ambient loop in quiet hours, batched over chapters since last consolidation
-  - Dream output is its own layer (`memory/dreams/`), user views it via `/memory dreams`
-- [ ] **OS-level ambient signals** *(moved from v1.5 — without this, "ambient" is just a timer)*
-  - **Clipboard watcher** — when the user copy-pastes large text, ambient may react ("looks like a legal doc, want me to prepare a summary?")
-  - **Active window observer** — Cell knows what the user is looking at (PDF, IDE, browser tab) → context without asking
-  - **Recent files** — what the user opened / modified in the last hour → ambient signal for a proactive trigger
-  - Implementation: lightweight background daemon (Windows: `pywin32`; macOS: AppleScript / `Quartz`; Linux: `xdotool`/`wmctrl`)
-  - Privacy gate: per-app whitelist, clipboard never persisted without explicit consent
-- [ ] **Persona forking** — "coding assistant", "researcher", "therapist" personas
-  - Shared Core memory (who the user is) + per-persona Procedural & Episodic
-  - `/persona researcher`
-- [ ] **Local fine-tuning** — user data → personal LoRA
-  - Fine-tune a local Llama / Qwen on user-specific patterns (data never leaves the machine)
-  - Cell learns "how this specific person thinks" — Hermes doesn't do this
-- [ ] **Memory provenance & undo** — every `memory_engine.add()` has a source pointer
-  - *"Why does Cell think I'm allergic to strawberries?"* → shows the sentence from a conversation 3 weeks ago
-  - `/memory revert <id>` — undo a specific memory without touching neighbors
-- [ ] **Encrypted-at-rest by default** — `memory/`, `context.json`, `chats/` encrypted
-  - Master passphrase or OS keychain
-  - Zero-knowledge: without the key, even Cell itself cannot read old state
-- [ ] **Multi-device E2EE sync** — own relay or Syncthing wrapper
-  - Phone ↔ laptop ↔ server: same persona, same memory
-  - Conflict resolution: "newest semantic, append-merge episodic"
-
-→ *Cell is no longer a Hermes clone — it has deeper memory, a sleep cycle, safe self-improvement with tests and a red team, ambient OS signals, and local fine-tuning.*
-
----
-
-## Phase 3: Production (v1.0)
-
-Goal: a product ready for wide use.
-
-### v1.0 — "The Workstation"
-- [ ] **Docker support** — full Cell as a Docker container
-  - `docker run -it cell2` — instant start
-  - Persistent volume for `memory/`, `context.json`, `chats/`, config
-  - Ideal for 24/7 server deployment; docker-compose with Redis/Postgres
-- [ ] **Optional GUI** — lightweight native GUI; TUI stays primary
-- [ ] **Installer & auto-update** — Windows MSI / macOS DMG / Linux AppImage
-- [ ] **Companion app (macOS)** — menubar access, native notifications
-- [ ] **Local LLM by default** — llama.cpp or similar; cloud as fallback
-- [ ] **Agent marketplace** — sharing and discovery of skill packages (extension of v0.7 registry)
-
-→ *Now it's a product for normal people.*
-
----
-
-## Phase 4: Advanced (v1.5+)
-
-### v1.5 — "Ambient Intelligence v2"
-- [ ] **Native system notifications** — Cell pushes via OS notification center (Windows toast, macOS NC, Linux libnotify)
-- [ ] **Advanced analytics** — analysis of user behavior, productivity, habits
-- [ ] **Ambient action proposals** — not just "say something", but "do something" with a confirm dialog (e.g., after copy-paste auto-prepare a response template)
-
-### v1.6 — "Team Mode"
-- [x] **Thread system** *(shipped in v0.5 web UI)*
-- [ ] **Team Mode** — multiple users, shared session
-- [ ] **Shared sessions** — two people + agent in one conversation
-
-→ *Now it does team collaboration too.*
+- [ ] **Rebuild TUI from scratch** — fresh implementation with proper architecture
+- [ ] **Smart interaction** — a function-calling tool that lets the agent request credentials/config from the user interactively
+  - Agent calls `smart_interaction` via function calling (e.g. when it detects MCP would help)
+  - TUI presents a dialog for the user to enter the required data (API keys, MCP server URLs, etc.)
+  - System stores values in `credentials.json` as constants, **not** the agent
+  - LLM only sees variable names (e.g. `OPEN_METEO_API_KEY`), never the actual secrets
+  - Increases security (LLM never touches secrets) and efficiency (no long keys in context)
+  - Generated `self_improve` functions can reference these credentials by name too
+  - **Rule:** Everything except core system config (main model API key) moves to `credentials.json`; core config stays in `config.yaml`
 
 ---
 

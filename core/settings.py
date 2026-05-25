@@ -73,7 +73,7 @@ def ambient_config() -> dict:
 
 
 def set_ambient(key: str, value) -> None:
-    if key not in AMBIENT_DEFAULTS:
+    if key not in AMBIANT_DEFAULTS:
         raise ValueError(f"unknown ambient key: {key}")
     data = _load()
     amb = data.get("ambient", {})
@@ -82,3 +82,17 @@ def set_ambient(key: str, value) -> None:
     amb[key] = value
     data["ambient"] = amb
     _save(data)
+
+
+def is_auto_route() -> bool:
+    cfg_path = os.path.join(os.path.dirname(__file__), "..", "config.yaml")
+    try:
+        import yaml
+
+        if os.path.exists(cfg_path):
+            with open(cfg_path, "r", encoding="utf-8") as f:
+                cfg = yaml.safe_load(f) or {}
+            return bool(cfg.get("auto_route", False))
+    except Exception:
+        pass
+    return False

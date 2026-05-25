@@ -12,9 +12,11 @@ from core import (
     chats_store,
     compressor,
     context_store,
+    credentials,
     memory_session,
     memory_store,
     runner,
+    safety_watchdog,
     scheduler,
     settings,
 )
@@ -27,23 +29,54 @@ from core.chat import (
 from core.memory_engine import engine as memory_engine
 from core.memory_curator import start_session_curation, start_turn_curation
 
-BRAIN_FUNCTIONS_DIR = os.path.join(
-    os.path.dirname(__file__), "..", "brain", "functions"
-)
-BRAIN_FILE = os.path.join(os.path.dirname(__file__), "..", "brain", "brain.py")
-BRAIN_FACTORY_FILE = os.path.join(
-    os.path.dirname(__file__), "..", "brain", "brain_factory.py"
-)
-BACKUP_DIR = os.path.join(os.path.dirname(__file__), "..", "brain", "backup")
+BRAIN_FUNCTIONS_DIR = os.path.join(os.path.dirname(__file__), "functions")
+BRAIN_FILE = os.path.join(os.path.dirname(__file__), "brain.py")
+BRAIN_FACTORY_FILE = os.path.join(os.path.dirname(__file__), "brain_factory.py")
 
 if not os.path.exists(BRAIN_FILE) and os.path.exists(BRAIN_FACTORY_FILE):
     shutil.copy2(BRAIN_FACTORY_FILE, BRAIN_FILE)
+
+_TIMING_LOG = os.path.join(os.path.dirname(__file__), "..", "timings.jsonl")
+
+
+def _log_timing(msg_len: int, resp_len: int, duration: float, calls: int) -> None:
+    import json as _json
+
+    entry = {
+        "ts": datetime.datetime.now().isoformat(timespec="seconds"),
+        "msg_len": msg_len,
+        "resp_len": resp_len,
+        "duration_s": duration,
+        "llm_calls": calls,
+    }
+    try:
+        with open(_TIMING_LOG, "a", encoding="utf-8") as f:
+            f.write(_json.dumps(entry, ensure_ascii=False) + "\n")
+    except Exception:
+        pass
+
+_smart_lock = threading.Lock()
+_smart_request: dict | None = None
+_smart_response: str | None = None
+_smart_event = threading.Event()
+
+
+def get_smart_request() -> dict | None:
+    with _smart_lock:
+        return dict(_smart_request) if _smart_request else None
+
+
+def set_smart_response(value: str | None) -> None:
+    global _smart_response
+    with _smart_lock:
+        _smart_response = value
+    _smart_event.set()
 
 
 def _resolve_self_improve_dest(filename: str) -> tuple[str | None, str]:
     filename = filename.replace("\\", "/").strip()
 
-    if filename == "brain.py" or filename == "brain/brain.py":
+    if filename == "brain.py":
         return None, "brain.py"
 
     base = filename
@@ -76,12 +109,53 @@ def _handle_self_improve(args: dict) -> str:
     if dest is None:
         return f"[SYSTEM] self_improve rejected: invalid filename '{filename}'. Functions only — write a flat '<name>.py' (no subdirs, no absolute path). Rewriting brain.py is not allowed."
 
+    ok, err = safety_watchdog.smoke_test_function_source(code)
+    if not ok:
+        return f"[SYSTEM] self_improve rejected: {err}"
+
     os.makedirs(BRAIN_FUNCTIONS_DIR, exist_ok=True)
 
     with open(dest, "w", encoding="utf-8") as f:
         f.write(code)
 
     return f"[SYSTEM] self_improve OK: {resolved} created. Description: {description}"
+
+
+def _handle_smart_interaction(args: dict) -> str:
+    key = args["key"]
+    label = args["label"]
+    prompt = args["prompt"]
+    secret = args.get("secret", True)
+
+    existing = credentials.get(key)
+
+    global _smart_request, _smart_response, _smart_event
+    with _smart_lock:
+        _smart_request = {
+            "key": key,
+            "label": label,
+            "prompt": prompt,
+            "secret": secret,
+            "existing": existing,
+        }
+        _smart_response = None
+        _smart_event.clear()
+
+    _smart_event.wait(timeout=300)
+
+    with _smart_lock:
+        response = _smart_response
+        _smart_request = None
+        _smart_response = None
+
+    if response is None:
+        return f"[SYSTEM] smart_interaction skipped (timeout): {key}"
+
+    if response == "__CANCEL__":
+        return f"[SYSTEM] smart_interaction cancelled by user: {key}"
+
+    credentials.set(key, response)
+    return f"[SYSTEM] smart_interaction OK: {key} stored"
 
 
 def _format_file_attachment(file_path: str) -> dict:
@@ -130,6 +204,48 @@ def _format_file_attachment(file_path: str) -> dict:
             pass
         return {
             "text": f"[Attached PDF: {file_name} ({size_str}) — text extraction unavailable]"
+        }
+
+    doc_exts = {".docx", ".doc"}
+    if os.path.splitext(file_path)[1].lower() in doc_exts:
+        try:
+            import docx
+
+            doc = docx.Document(file_path)
+            text = "\n".join(p.text for p in doc.paragraphs if p.text.strip())
+            if text.strip():
+                return {
+                    "text": f"[Attached DOCX: {file_name} ({size_str})]\n```\n{text[:12000]}\n```"
+                }
+        except Exception:
+            pass
+        return {
+            "text": f"[Attached DOCX: {file_name} ({size_str}) — text extraction unavailable]"
+        }
+
+    if os.path.splitext(file_path)[1].lower() in {".xlsx", ".xls"}:
+        try:
+            import openpyxl
+
+            wb = openpyxl.load_workbook(file_path, read_only=True, data_only=True)
+            rows = []
+            for sheet in wb.worksheets[:10]:
+                rows.append(f"--- Sheet: {sheet.title} ---")
+                for i, row in enumerate(sheet.iter_rows(values_only=True)):
+                    if i >= 200:
+                        rows.append(f"... (truncated at 200 rows)")
+                        break
+                    rows.append("\t".join(str(c) if c is not None else "" for c in row))
+            wb.close()
+            text = "\n".join(rows)
+            if text.strip():
+                return {
+                    "text": f"[Attached XLSX: {file_name} ({size_str})]\n```\n{text[:12000]}\n```"
+                }
+        except Exception:
+            pass
+        return {
+            "text": f"[Attached XLSX: {file_name} ({size_str}) — text extraction unavailable]"
         }
 
     try:
@@ -218,13 +334,29 @@ def process(user_message: str, file_path: str = "", on_event=None) -> str:
     memory_store.set("ambient.last_user_ts", str(time.time()))
     record_user_activity_pattern()
 
-    def handle_improve(args: dict) -> str:
-        result = _handle_self_improve(args)
+    def handle_smart(args: dict) -> str:
+        result = _handle_smart_interaction(args)
         context_store.append("system", result)
         return result
 
+    import core_rpc as _rpc
+    _rpc.llm.reset_count()
+    t0 = time.time()
+
     output = runner.run_brain_subprocess(
-        messages, on_event=on_event, self_improve_handler=handle_improve
+        messages,
+        on_event=on_event,
+        smart_interaction_handler=handle_smart,
+    )
+
+    duration = round(time.time() - t0, 2)
+    calls = _rpc.llm.call_count
+
+    _log_timing(
+        msg_len=len(_extract_text_from_content(content)),
+        resp_len=len(output or ""),
+        duration=duration,
+        calls=calls,
     )
 
     if output == "[CANCELLED]":
@@ -278,7 +410,7 @@ def process_chat(
     output = runner.run_brain_subprocess(
         messages,
         on_event=on_event,
-        self_improve_handler=_make_improve_handler(chat_id=chat_id),
+        smart_interaction_handler=_make_smart_handler(),
     )
 
     if output == "[CANCELLED]":
@@ -291,21 +423,11 @@ def process_chat(
     return output
 
 
-def _make_improve_handler(chat_id: str | None = None) -> callable:
-    if chat_id:
+def _make_smart_handler() -> callable:
+    def handle_smart(args: dict) -> str:
+        return _handle_smart_interaction(args)
 
-        def handle_improve(args: dict) -> str:
-            result = _handle_self_improve(args)
-            chats_store.append(chat_id, "system", result)
-            return result
-    else:
-
-        def handle_improve(args: dict) -> str:
-            result = _handle_self_improve(args)
-            context_store.append("system", result)
-            return result
-
-    return handle_improve
+    return handle_smart
 
 
 def _run_scheduled_task(task: dict) -> None:
@@ -315,7 +437,8 @@ def _run_scheduled_task(task: dict) -> None:
         context_store.get_all(), task["description"], memory_context
     )
     output = runner.run_brain_subprocess(
-        messages, self_improve_handler=_make_improve_handler()
+        messages,
+        smart_interaction_handler=_make_smart_handler(),
     )
     if output and not output.startswith("[SYSTEM ERROR]"):
         context_store.append("assistant", f"[SCHEDULED] {output}")
@@ -393,7 +516,8 @@ def _run_ambient_tick(force: bool = False) -> str | None:
     memory_context = mem.get_relevant_for_prompt("ambient tick")
     messages = build_ambient_input(context_store.get_all(), memory_context)
     output = runner.run_brain_subprocess(
-        messages, self_improve_handler=_make_improve_handler()
+        messages,
+        smart_interaction_handler=_make_smart_handler(),
     )
     if output and not output.startswith("[SYSTEM ERROR]") and output.strip():
         context_store.append("assistant", f"[AMBIENT] {output}")
@@ -418,6 +542,9 @@ def _check_session_idle() -> None:
 def start_scheduler(
     interval_check: int = 10, ambient_interval: int | None = None
 ) -> None:
+    from core.memory_retrieval import preload_model
+    preload_model()
+
     def sched_loop():
         while True:
             for task in scheduler.get_due():

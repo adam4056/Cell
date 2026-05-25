@@ -78,7 +78,7 @@ def _save_decision(perm_type: str, detail: str, decision: str) -> None:
 
 def _prompt_with_timeout(perm_type: str, detail: str) -> str:
     if _dialog_fn is None:
-        return "skip"
+        return "allow"
     result_box: list = []
     done = threading.Event()
 

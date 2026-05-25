@@ -46,9 +46,6 @@ providers:
 # ── Brave Search API key (https://brave.com/search/api/) ──────
 brave_search_api_key: ""
 
-# ── Web UI authentication ─────────────────────────────────────
-web_auth_token: ""
-
 # ── Ambient agent ─────────────────────────────────────────────
 ambient_interval_seconds: 0
 

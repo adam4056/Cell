@@ -1,7 +1,7 @@
 """
 MCP (Model Context Protocol) client.
 Connects to MCP servers defined in config.yaml and exposes their tools
-to the brain as auto-generated function files in brain/functions/.
+to the brain as auto-generated function files in core/functions/.
 
 Config structure in config.yaml:
     mcp_servers:
@@ -19,7 +19,7 @@ import threading
 
 logger = logging.getLogger("mcp_client")
 
-_FUNCTIONS_DIR = os.path.join(os.path.dirname(__file__), "..", "brain", "functions")
+_FUNCTIONS_DIR = os.path.join(os.path.dirname(__file__), "functions")
 
 
 class MCPServer:

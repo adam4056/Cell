@@ -1,6 +1,5 @@
 # Runtime state / user data
 context.json
-context.json.backup
 memory.json
 schedule.json
 summary.json
@@ -13,24 +12,24 @@ chats/
 # Config (contains API keys — use config.yaml.example as template)
 config.yaml
 
+# Credentials (contains secrets — generated via smart_interaction)
+credentials.json
+
+# Timing log (response time tracking, append-only)
+timings.jsonl
+
 # Archives / old versions
 archive/
 
-# Brain runtime
-brain/brain/
-brain/backup/
-brain/functions/*.py
-!brain/functions/__init__.py
+# Brain — live file (auto-generated from brain_factory.py)
+core/brain.py
+
+# Generated tools (dynamic, wiped on factory reset)
+core/functions/*.py
+!core/functions/__init__.py
 
 # Test files
 memory_smoketest.py
-
-# Brain — live file (auto-generated from brain_factory.py)
-brain/brain.py
-brain/backup/
-brain/functions/
-brain/audio_temp/
-brain/assets/
 
 # Python
 __pycache__/
@@ -59,7 +58,8 @@ BIO.md
 
 # AI dev helpers (instructions / notes for working on this project)
 CLAUDE.md
-TODO.md
+CHANGE.md
+AGENTS.md
 
 # Claude Code internal
 .claude/
